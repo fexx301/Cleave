@@ -68,7 +68,8 @@ export function installWireSpy(): void {
         method: init?.method || "GET",
         bodyLength: bodyText.length,
         bodyText,
-        channel: currentChannel,
+        // App Check / reCAPTCHA token traffic fires on page load; log it, but not as Cleave analysis traffic.
+        channel: /firebaseappcheck\.googleapis\.com|\/recaptcha\//i.test(url) ? "app_check" : currentChannel,
         caseLabel: currentCaseLabel
       });
       notify();

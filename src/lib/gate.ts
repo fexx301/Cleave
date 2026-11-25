@@ -116,7 +116,7 @@ export const ALLOWLIST_FIELDS: readonly AllowlistFieldMeta[] = [
   },
   {
     key: "days_since_service",
-    label: "Days Since Visit (Relative)",
+    label: "Days Since Visit",
     shortHint: "Integer day count — never your real calendar date.",
     removalConsequence: "Cannot verify time-bound retroactive prior authorization windows (e.g., 14 days).",
     kind: "integer",
@@ -125,7 +125,7 @@ export const ALLOWLIST_FIELDS: readonly AllowlistFieldMeta[] = [
   },
   {
     key: "days_since_denial",
-    label: "Days Since Denial Notice (Relative)",
+    label: "Days Since Denial Notice",
     shortHint: "Integer day count — never your real notice date.",
     removalConsequence: "Cannot verify whether the 180-calendar-day internal appeal window is still open.",
     kind: "integer",
@@ -338,6 +338,26 @@ export function detectOngoingTreatmentCue(rawLetter: string): "YES" | "NOT_MENTI
     ? "YES"
     : "NOT_MENTIONED";
 }
+
+/**
+ * Chart-urgency evidence in the letter text. Used only to downgrade Nano: words like
+ * "urgent care" are a setting, not proof that a physician documented clinical urgency.
+ */
+export function detectUrgencyDocumentedCue(rawLetter: string): "YES" | "NO" | "NOT_MENTIONED" {
+  const negated =
+    /\b(?:did not|does not|didn't|no|without|missing)\b[^.\n]{0,40}\b(?:chart notes?|documentation|records?)\b[^.\n]{0,30}\burgen/i;
+  const affirmed =
+    /\b(?:chart notes?|medical records?|documentation)\b[^.\n]{0,40}\b(?:document|indicat|show|support|confirm|note)\w*[^.\n]{0,30}\burgen|\burgency (?:was |is |has been )?(?:documented|noted|confirmed)\b/i;
+  if (negated.test(rawLetter)) return "NO";
+  if (affirmed.test(rawLetter)) return "YES";
+  return "NOT_MENTIONED";
+}
+
+console.assert(detectUrgencyDocumentedCue("Service Category: After-hours urgent care evaluation") === "NOT_MENTIONED");
+console.assert(
+  detectUrgencyDocumentedCue("Note: The claim submission did not include chart notes regarding urgency.") === "NO"
+);
+console.assert(detectUrgencyDocumentedCue("Chart notes document clinical urgency for the MRI.") === "YES");
 
 export function detectNetworkStatusCue(rawLetter: string): NetworkStatus | null {
   if (/\b(?:out-of-network|non-participating)\b/i.test(rawLetter)) return "OUT_OF_NETWORK";

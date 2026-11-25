@@ -3,6 +3,39 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+// Display-only plain-English labels; payloads and scoring keep the enum codes.
+private func plainLabel(_ code: String) -> String {
+    let labels: [String: String] = [
+        "MISSING_REFERRAL": "Missing referral",
+        "MISSING_PRIOR_AUTH": "Missing prior authorization",
+        "MISSING_REFERRAL_AND_OON": "Missing referral, out-of-network",
+        "EMERGENCY_OR_AFTER_HOURS_URGENT": "Emergency or after-hours urgent care",
+        "OUTPATIENT_OBGYN": "OB-GYN visit",
+        "OUTPATIENT_BEHAVIORAL_HEALTH": "Behavioral health",
+        "ADVANCED_DIAGNOSTIC_IMAGING": "Advanced imaging (MRI / CT / PET)",
+        "POST_OP_SPECIALIST_FOLLOWUP": "Post-op specialist follow-up",
+        "ELECTIVE_OUTPATIENT_SPECIALIST": "Elective specialist visit",
+        "IN_NETWORK": "In network",
+        "OUT_OF_NETWORK": "Out of network",
+        "NOT_MENTIONED": "Not in letter",
+        "UNKNOWN": "Unknown",
+        "OTHER": "Other",
+        "YES": "Yes",
+        "NO": "No"
+    ]
+    return labels[code] ?? code
+}
+
+private func exceptionLabel(_ code: String) -> String {
+    switch code {
+    case "YES": return "Exception applies"
+    case "CONDITIONAL": return "Exception possible — needs your confirmation"
+    case "NO": return "No exception applies"
+    case "UNKNOWN_NO_POLICY": return "Can't tell without your plan"
+    default: return "Exception: \(code)"
+    }
+}
+
 @MainActor
 final class CleaveViewModel: ObservableObject {
     private let engine = CleaveHybridEngine()
@@ -570,7 +603,7 @@ struct ContentView: View {
                 .foregroundStyle(CleavePalette.inkPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Apple Foundation Models classifies your claim strictly on-device. Deterministic Swift code builds an allowlist you control before Firebase AI Logic matches your plan's exception clauses.")
+            Text("AI running on your iPhone pulls out your personal details and keeps them here. You review a short list of facts that don't identify you, and only those go to the cloud to find the part of your plan that can overturn the denial.")
                 .font(.system(size: 13.5))
                 .foregroundStyle(CleavePalette.inkMuted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -688,10 +721,10 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Local Identity Vault (\(vault.displayEntries.count) held on-device)")
+                            Text("Personal details kept on this device (\(vault.displayEntries.count))")
                                 .font(.system(size: 12.5, weight: .semibold))
                                 .foregroundStyle(CleavePalette.inkPrimary)
-                            Text("on_device · 0 HTTP req · \(String(format: "%.1fs", Double(vm.localLatencyMs) / 1000.0))")
+                            Text("0 network requests · \(String(format: "%.1fs", Double(vm.localLatencyMs) / 1000.0))")
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundStyle(CleavePalette.greenInk)
                         }
@@ -769,7 +802,7 @@ struct ContentView: View {
             HStack(spacing: 5) {
                 Image(systemName: "scissors")
                     .font(.system(size: 11))
-                Text("DETERMINISTIC ALLOWLIST BOUNDARY")
+                Text("PRIVACY BOUNDARY")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
             }
             .foregroundStyle(CleavePalette.inkMuted)
@@ -783,11 +816,11 @@ struct ContentView: View {
     private var allowlistCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
-                CleavePillTag("YOU CHOOSE WHAT LEAVES · FIREBASE AI LOGIC", tone: .blue)
-                Text("Outgoing Allowlist Control")
+                CleavePillTag("YOU CHOOSE WHAT LEAVES", tone: .blue)
+                Text("What Gets Sent")
                     .font(.system(size: 20, weight: .regular, design: .serif))
                     .foregroundStyle(CleavePalette.inkPrimary)
-                Text("Inspect exact values before anything crosses the wire. Toggle off any field to see how the result changes.")
+                Text("Only these facts go to the cloud, and none of them name you. Toggle any off to keep it back.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(CleavePalette.inkMuted)
             }
@@ -816,7 +849,7 @@ struct ContentView: View {
                                                 .font(.system(size: 13, weight: .semibold))
                                                 .foregroundStyle(CleavePalette.inkPrimary)
                                             Spacer()
-                                            Text(val)
+                                            Text(plainLabel(val))
                                                 .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                                                 .foregroundStyle(isChecked ? CleavePalette.blueInk : CleavePalette.inkMuted)
                                                 .lineLimit(1)
@@ -906,7 +939,7 @@ struct ContentView: View {
                     .disabled(vm.analyzingCloud || vm.runningOffline || !(vm.liveGate?.ok ?? false))
                 }
             } else {
-                Text("Nothing has left your device. Tap \"Cleave Letter on Device\" above to extract a structured allowlist locally via Apple Foundation Models.")
+                Text("Nothing has left your device. Tap \"Cleave Letter on Device\" above to read your letter on this iPhone.")
                     .font(.system(size: 13))
                     .foregroundStyle(CleavePalette.blueInk)
                     .padding(12)
@@ -931,7 +964,7 @@ struct ContentView: View {
                     Text(
                         hasActivePolicy
                             ? (vm.activeCustomEoc?.planName ?? matchedBuiltIn?.planName ?? effective.planId)
-                            : "Degrades honestly to General Guidance Only (Clause NONE)."
+                            : "Cleave will give general guidance only, since it can't look up your plan."
                     )
                     .font(.system(size: 11.5))
                     .foregroundStyle(CleavePalette.inkBody)
@@ -1038,7 +1071,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 14) {
                 if vm.isResultStale {
                     HStack {
-                        Text("Allowlist or EOC changed since this result.")
+                        Text("What gets sent has changed since this result.")
                             .font(.system(size: 12.5, weight: .semibold))
                             .foregroundStyle(CleavePalette.yellowInk)
                         Spacer()
@@ -1071,13 +1104,13 @@ struct ContentView: View {
                     HStack {
                         CleavePillTag(
                             analysis.modeUsed == "POLICY_MATCHED"
-                                ? "POLICY MATCHED · Clause \(analysis.citedClauseId)"
-                                : "GENERAL GUIDANCE · Clause NONE",
+                                ? "Matched your plan · Section \(analysis.citedClauseId)"
+                                : "General guidance · no plan section",
                             tone: analysis.modeUsed == "POLICY_MATCHED" ? .blue : .yellow
                         )
                         Spacer()
                         CleavePillTag(
-                            "Exception: \(analysis.exceptionApplies)",
+                            exceptionLabel(analysis.exceptionApplies),
                             tone: analysis.exceptionApplies == "YES"
                                 ? .green
                                 : (analysis.exceptionApplies == "CONDITIONAL" ? .yellow : .red)
@@ -1086,8 +1119,8 @@ struct ContentView: View {
 
                     Text(
                         analysis.citedClauseQuote.isEmpty
-                            ? "General Guidance (No Policy Matched)"
-                            : "Controlling Policy Text (\(analysis.citedClauseId))"
+                            ? "General Guidance"
+                            : "What Your Plan Says (Section \(analysis.citedClauseId))"
                     )
                     .font(.system(size: 18, weight: .regular, design: .serif))
                     .foregroundStyle(CleavePalette.inkPrimary)
@@ -1107,7 +1140,7 @@ struct ContentView: View {
                         .foregroundStyle(CleavePalette.inkBody)
                         .lineSpacing(3)
 
-                    Text("Verified wire audit: 0 identifier leaks · \(vm.cloudBytesSent) B · \(vm.cloudRuntimeLabel)")
+                    Text("Checked what was sent: 0 of your personal details in \(vm.cloudBytesSent) bytes.")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(CleavePalette.inkMuted)
                 }
@@ -1117,7 +1150,7 @@ struct ContentView: View {
                 if analysis.needsPatientConfirmation && !analysis.confirmationItems.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         CleavePillTag(
-                            analysis.modeUsed == "POLICY_MATCHED" ? "NEEDS_PATIENT_CONFIRMATION" : "NEXT STEPS WITHOUT PLAN POLICY",
+                            analysis.modeUsed == "POLICY_MATCHED" ? "Needs your confirmation" : "Next steps without your plan",
                             tone: .yellow
                         )
                         Text(
@@ -1167,14 +1200,14 @@ struct ContentView: View {
                 // Editable Locally Re-Joined Draft
                 VStack(alignment: .leading, spacing: 10) {
                     CleavePillTag(
-                        "RE-JOINED ON DEVICE · \(joined.orphanPlaceholders.count) ORPHAN PLACEHOLDERS",
-                        tone: .green
+                        joined.orphanPlaceholders.isEmpty ? "Filled in on this device" : "\(joined.orphanPlaceholders.count) blanks left to fill",
+                        tone: joined.orphanPlaceholders.isEmpty ? .green : .yellow
                     )
-                    Text("Editable Request for Review")
+                    Text("Your Appeal Draft")
                         .font(.system(size: 20, weight: .regular, design: .serif))
                         .foregroundStyle(CleavePalette.inkPrimary)
 
-                    Text("Cloud returned opaque placeholders; Cleave re-inserted \(joined.rejoinedTokens.count) local vault identifier(s) strictly in iPhone memory.")
+                    Text("The cloud wrote this with blanks like [MEMBER_NAME]; your iPhone filled in \(joined.rejoinedTokens.count) personal details. Edit freely before sending.")
                         .font(.system(size: 12.5))
                         .foregroundStyle(CleavePalette.inkMuted)
 

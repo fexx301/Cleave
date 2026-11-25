@@ -20,6 +20,7 @@ import {
   detectOngoingTreatmentCue,
   detectPlanIdCue,
   detectServiceSettingCue,
+  detectUrgencyDocumentedCue,
   extractDeterministicVault,
   mergeVaults,
   scanOutboundBodyForCanaries
@@ -554,6 +555,7 @@ ${rawLetter}`;
     const detDenialReason = detectDenialReasonCue(rawLetter);
     const detServiceSetting = detectServiceSettingCue(rawLetter);
     const detOngoing = detectOngoingTreatmentCue(rawLetter);
+    const detUrgency = detectUrgencyDocumentedCue(rawLetter);
     const detNetwork = detectNetworkStatusCue(rawLetter);
     const detPlanId = detectPlanIdCue(rawLetter);
 
@@ -581,6 +583,14 @@ ${rawLetter}`;
         nanoProp.ongoing_treatment === "YES" || detOngoing === "YES"
           ? "YES"
           : nanoProp.ongoing_treatment || "NOT_MENTIONED",
+      // Downgrade-only: a Nano "YES" without textual evidence becomes NOT_MENTIONED, so Cloud asks the
+      // patient to confirm instead of citing an urgency fact the letter never states.
+      urgency_documented:
+        detUrgency !== "NOT_MENTIONED"
+          ? detUrgency
+          : nanoProp.urgency_documented === "YES"
+            ? "NOT_MENTIONED"
+            : nanoProp.urgency_documented || "NOT_MENTIONED",
       days_since_service: dayOffsets.daysSinceService,
       days_since_denial: dayOffsets.daysSinceDenial
     };

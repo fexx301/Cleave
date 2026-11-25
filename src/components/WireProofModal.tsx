@@ -34,9 +34,13 @@ export function WireProofModal({ open, onClose, wireEntries, trail, identityVaul
     [wireEntries]
   );
 
-  // Audit EVERY Cleave production request against ALL local vault secrets seen across the entire session (plain + Base64)
+  // Audit EVERY Cleave production request against ALL local vault secrets seen across the entire session (plain + Base64).
+  // App Check token requests are scanned too, so moving them out of the production count never hides a leak.
   const currentVaultCount = getDisplayVaultEntries(identityVault).length;
-  const allProdBody = prodEntries.map((e) => e.bodyText).join("\n");
+  const allProdBody = wireEntries
+    .filter((e) => e.channel === "cleave_production" || e.channel === "app_check")
+    .map((e) => e.bodyText)
+    .join("\n");
   const crossCaseProdLeaks = useMemo(
     () => scanOutboundBodyForCanaries(allProdBody, sessionVaultSecrets),
     [allProdBody, sessionVaultSecrets]
@@ -213,7 +217,7 @@ export function WireProofModal({ open, onClose, wireEntries, trail, identityVaul
             role="tab"
             aria-selected={tab === "lab_eval"}
           >
-            Fail-Closed Lab &amp; Manual Baseline ({labAndEvalEntries.length})
+            Lab, Eval &amp; App Check ({labAndEvalEntries.length})
           </button>
           {wireEntries.length > 0 && (
             <button className="btn btn-sm" style={{ marginLeft: "auto" }} onClick={clearWireEntries}>
@@ -226,7 +230,7 @@ export function WireProofModal({ open, onClose, wireEntries, trail, identityVaul
           <div className="callout callout-green">
             {tab === "production"
               ? "Zero Cleave production HTTPS requests recorded yet. On-device ONLY_ON_DEVICE extraction produces zero network traffic."
-              : "No Fail-Closed Lab or Manual-Baseline evaluation requests captured yet."}
+              : "No Fail-Closed Lab, Manual-Baseline evaluation, or App Check requests captured yet."}
           </div>
         ) : (
           shownEntries.map((entry) => {

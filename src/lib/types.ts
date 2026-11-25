@@ -126,7 +126,7 @@ export interface RejoinedDraft {
   orphanPlaceholders: string[];
 }
 
-export type WireChannel = "cleave_production" | "fail_closed_lab" | "manual_baseline_eval";
+export type WireChannel = "cleave_production" | "fail_closed_lab" | "manual_baseline_eval" | "app_check";
 
 export interface WireEntry {
   id: string;

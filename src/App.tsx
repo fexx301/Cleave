@@ -677,7 +677,7 @@ export default function App() {
         {/* Step 1: Sample Selector & Local PDF Intake */}
         <section className="intake-bar" aria-label="Denial letter source">
           <div className="intake-header">
-            <span className="intake-label">1. Load a Synthetic Sample Denial or Open a Local PDF / Text File</span>
+            <span className="intake-label">1. Pick a sample denial or use your own letter</span>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <input
                 ref={fileInputRef}
@@ -874,20 +874,19 @@ export default function App() {
                   <div className="callout callout-green">
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                       <div>
-                        <strong>Policy matching enabled:</strong> Cloud Gemini will check your allowlisted facts against{" "}
+                        <strong>Checking against your plan:</strong>{" "}
                         {activeCustomEoc ? (
                           <>
-                            custom uploaded EOC <strong>{activeCustomEoc.plan_name}</strong>
+                            <strong>{activeCustomEoc.plan_name}</strong> (your uploaded document)
                           </>
                         ) : (
                           <>
-                            <code>{matchedPlan!.plan_id}</code> ({matchedPlan!.plan_name})
+                            {matchedPlan!.plan_name} <code>{matchedPlan!.plan_id}</code>
                           </>
                         )}
-                        .
                       </div>
                       <button className="btn btn-sm" onClick={() => setEocDrawerOpen((o) => !o)}>
-                        {eocDrawerOpen ? "Hide Policy EOC" : "Use Own EOC / Inspect"}
+                        {eocDrawerOpen ? "Hide plan document" : "View or use my own plan"}
                       </button>
                     </div>
                   </div>
@@ -896,15 +895,15 @@ export default function App() {
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                       <div>
                         <strong>
-                          {planIdEnabled ? "No matching built-in EOC found:" : "Plan Policy Identifier removed:"}
+                          {planIdEnabled ? "We don't have your plan's document:" : "Plan ID not sent:"}
                         </strong>{" "}
                         {planIdEnabled
-                          ? "Upload or paste your own public Plan EOC PDF/text below, or continue with General Guidance Only."
-                          : "Cleave can no longer match your specific Evidence of Coverage clauses and will degrade honestly to General Guidance Only."}
+                          ? "Add your plan's public coverage booklet (PDF or text), or continue with general guidance."
+                          : "Cleave can't look up your plan's rules, so you'll get general guidance only."}
                       </div>
                       {planIdEnabled && (
                         <button className="btn btn-sm" onClick={() => setEocDrawerOpen((o) => !o)}>
-                          {eocDrawerOpen ? "Hide Policy EOC" : "Upload / Paste Own EOC"}
+                          {eocDrawerOpen ? "Hide plan document" : "Add my plan document"}
                         </button>
                       )}
                     </div>
@@ -1326,7 +1325,7 @@ export default function App() {
                   >
                     {rejoined.orphanPlaceholders.length
                       ? `${rejoined.orphanPlaceholders.length} blanks left to fill`
-                      : "Filled in on this device"}
+                      : `${rejoined.rejoinedTokens.length} details filled in on this device`}
                   </span>
                   <h3
                     style={{
@@ -1340,8 +1339,8 @@ export default function App() {
                     Your Appeal Draft
                   </h3>
                   <p className="pane-desc">
-                    The cloud wrote this with blanks like <code>[MEMBER_NAME]</code>; your browser filled in{" "}
-                    <strong>{rejoined.rejoinedTokens.length}</strong> personal details. Edit freely before sending.
+
+                    The cloud only ever saw blanks like <code>[MEMBER_NAME]</code>. Edit freely before sending.
                   </p>
                 </div>
 
