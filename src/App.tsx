@@ -33,6 +33,7 @@ import {
   rejoinDraftLocally,
   verifyCustomEocSafety
 } from "./lib/gate";
+import { EXCEPTION_LABELS, NANO_STATUS_LABELS, humanizeValue, humanizeVaultKey, toMemberVoice } from "./lib/labels";
 import { extractPdfTextLocally } from "./lib/pdf";
 import type {
   AllowlistKey,
@@ -115,6 +116,21 @@ export default function App() {
   const [wireEntries, setWireEntries] = useState<WireEntry[]>(() => getAllWireEntries());
   const [trail, setTrail] = useState<InferenceTrailStep[]>([]);
   const [sessionVaultSecrets, setSessionVaultSecrets] = useState<string[]>([]);
+
+  // Bring each new result into view; results render below the fold after a long wait.
+  const resultsRef = useRef<HTMLElement | null>(null);
+  const offlineRef = useRef<HTMLElement | null>(null);
+  const scrollIntoViewGently = (el: HTMLElement | null) =>
+    el?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start"
+    });
+  useEffect(() => {
+    if (cloudAnalysis) scrollIntoViewGently(resultsRef.current);
+  }, [cloudAnalysis]);
+  useEffect(() => {
+    if (offlineTriage) scrollIntoViewGently(offlineRef.current);
+  }, [offlineTriage]);
 
   useEffect(() => {
     const unsub = subscribeWire(() => setWireEntries(getAllWireEntries()));
@@ -306,7 +322,7 @@ export default function App() {
     const nextRunId = `run-${Date.now()}`;
     setActiveRunId(nextRunId);
     setCleaving(true);
-    setCleaveStageNote("1/2 Warming local Gemini Nano & extracting identifiers strictly on-device (0 HTTP calls)...");
+    setCleaveStageNote("1/2 Warming up the on-device model and finding your personal details…");
     setLocalError(null);
     setCloudError(null);
     setCloudAnalysis(null);
@@ -320,7 +336,7 @@ export default function App() {
       : new Date().toISOString().slice(0, 10);
 
     const stageTimer = window.setTimeout(() => {
-      setCleaveStageNote("2/2 Building typed allowlist & verifying deterministic code gate locally...");
+      setCleaveStageNote("2/2 Building the list of safe facts and running the privacy check…");
     }, 3500);
 
     const res = await extractOnDevice(rawLetter, refDate);
@@ -390,11 +406,11 @@ export default function App() {
     }
     if (!liveGate || !identityVault) return;
     if (!liveGate.ok) {
-      setCloudError(`${liveGate.refusal}: ${liveGate.reason}`);
+      setCloudError(`Blocked before sending: ${liveGate.reason} (${liveGate.refusal})`);
       return;
     }
     if (eocSourceMode === "custom" && planIdEnabled && customEocCheck && !customEocCheck.ok) {
-      setCloudError(`${customEocCheck.refusal}: ${customEocCheck.reason}`);
+      setCloudError(`Blocked before sending: ${customEocCheck.reason} (${customEocCheck.refusal})`);
       return;
     }
 
@@ -416,12 +432,19 @@ export default function App() {
         caseLabel: activeCaseLabel,
         onRetry: (n) =>
           setCloudRetryNote(
-            `${n.isRateLimit ? "Rate limited (429)" : "Cloud busy"} — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s...`
+            `${n.isRateLimit ? "Cloud rate limit" : "Cloud busy"} — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s…`
           )
       });
 
       const localJoined = rejoinDraftLocally(out.analysis.draft_request_for_review, identityVault);
-      setCloudAnalysis(out.analysis);
+      // The prompt asks for first-person statements; normalize once so preview and inserted text agree.
+      setCloudAnalysis({
+        ...out.analysis,
+        confirmation_items: out.analysis.confirmation_items.map((item) => ({
+          ...item,
+          draft_statement: toMemberVoice(item.draft_statement)
+        }))
+      });
       setCloudMeta({
         source: out.inferenceSource,
         latencyMs: out.latencyMs,
@@ -560,7 +583,7 @@ export default function App() {
             <div className="status-strip">
               <span className={`tag ${nanoStatus === "available" ? "tag-green" : "tag-yellow"}`}>
                 <span className="dot" />
-                Nano: {nanoStatus === "available" ? "On-Device Ready" : nanoStatus}
+                Nano: {NANO_STATUS_LABELS[nanoStatus] ?? humanizeValue(nanoStatus)}
               </span>
               <span className={`tag ${firebaseInfo.ready ? "tag-blue" : "tag-neutral"}`}>
                 <span className="dot" />
@@ -600,9 +623,9 @@ export default function App() {
             Understand why this claim was denied and draft a response without uploading the original letter.
           </h1>
           <p className="hero-sub">
-            Gemini Nano extracts your personal details strictly on this device. Deterministic code builds an allowlist of
-            non-identifying claim facts that you review and edit before Cloud Gemini matches your policy&apos;s exception
-            clauses.
+            AI running in your browser pulls out your personal details and keeps them here. You review a short list of
+            facts that don&apos;t identify you, and only those go to the cloud to find the part of your plan that can
+            overturn the denial.
           </p>
         </section>
 
@@ -619,10 +642,9 @@ export default function App() {
             }}
           >
             <div>
-              <strong>On-device Gemini Nano is unavailable in this browser ({nanoStatus}).</strong> Because Cleave runs
-              fail-closed (<code>ONLY_ON_DEVICE</code>), it refuses to silently send your raw letter to the cloud. Open
-              in <strong>Chrome Desktop 139+</strong> with <code>chrome://flags/#prompt-api</code> enabled — or inspect
-              the <em>Fail-Closed Lab</em> to see why.
+              <strong>This browser can&apos;t run the on-device AI Cleave needs.</strong> Rather than upload your letter
+              instead, Cleave stops here. Open it in <strong>Chrome on a desktop computer</strong> to use it, or see the{" "}
+              <em>Fail-Closed Lab</em> for why. <code className="mode-code">{nanoStatus} · ONLY_ON_DEVICE</code>
             </div>
             <button className="btn btn-sm" onClick={() => setActiveModal("lab")}>
               Open Fail-Closed Lab
@@ -717,11 +739,12 @@ export default function App() {
             <div className="pane-head">
               <div>
                 <span className="tag tag-green">
-                  <DeviceLockIcon /> Stays on Your Device · ONLY_ON_DEVICE
+                  <DeviceLockIcon /> Stays on your device
                 </span>
                 <h2 className="pane-title">Original Denial Letter</h2>
                 <p className="pane-desc">
-                  Raw letter text never enters the cloud serializer. Extracted identifiers stay strictly in local memory.
+                  Your letter is read here and never uploaded. Personal details stay in this browser.{" "}
+                  <code className="mode-code">ONLY_ON_DEVICE</code>
                 </p>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setLetterEditMode((m) => !m)}>
@@ -754,10 +777,11 @@ export default function App() {
                 <div className="vault-header">
                   <div>
                     <strong style={{ fontSize: 12.5, color: "var(--ink-primary)" }}>
-                      Local Identity Vault ({vaultEntries.length} held on-device)
+                      Personal details kept on this device ({vaultEntries.length})
                     </strong>
                     {localMeta && (
                       <span
+                        title={`Inference source: ${localMeta.source}`}
                         style={{
                           marginLeft: 8,
                           fontFamily: "var(--font-mono)",
@@ -765,7 +789,7 @@ export default function App() {
                           color: "var(--pastel-green-ink)"
                         }}
                       >
-                        {localMeta.source} · {localMeta.httpRequests} HTTP req · {(localMeta.latencyMs / 1000).toFixed(1)}s
+                        {localMeta.httpRequests} network requests · {(localMeta.latencyMs / 1000).toFixed(1)}s
                       </span>
                     )}
                   </div>
@@ -782,7 +806,7 @@ export default function App() {
                   <div className="vault-grid">
                     {vaultEntries.map(([k, v]) => (
                       <div className="vault-item" key={k}>
-                        <span className="vault-key">{k}</span>
+                        <span className="vault-key">{humanizeVaultKey(k)}</span>
                         <span className="vault-val">{v}</span>
                       </div>
                     ))}
@@ -798,12 +822,12 @@ export default function App() {
                 disabled={cleaving || !rawLetter.trim()}
               >
                 {cleaving && <span className="spinner" />}
-                {cleaving ? "Cleaving on Device (Gemini Nano)..." : "Cleave Letter on Device"}
+                {cleaving ? "Reading on this device…" : "Cleave Letter on Device"}
               </button>
               <span style={{ fontSize: 12, color: "var(--ink-muted)" }}>
                 {cleaving
-                  ? cleaveStageNote || "First local run can take ~15–20s to warm GPU weights."
-                  : "Fail-closed: throws instead of falling back to cloud."}
+                  ? cleaveStageNote || "First run can take 15–30s while the on-device model warms up."
+                  : "If on-device AI is unavailable, Cleave stops instead of uploading."}
               </span>
             </div>
           </div>
@@ -820,11 +844,12 @@ export default function App() {
             <div className="pane-head">
               <div>
                 <span className="tag tag-blue">
-                  <CloudSplitIcon /> You Choose What Leaves · ONLY_IN_CLOUD
+                  <CloudSplitIcon /> You choose what leaves
                 </span>
-                <h2 className="pane-title">Outgoing Allowlist Control</h2>
+                <h2 className="pane-title">What Gets Sent</h2>
                 <p className="pane-desc">
-                  Inspect exact values before anything crosses the wire. Uncheck any field to see how the result changes.
+                  Only these facts go to the cloud, and none of them name you. Uncheck any to keep it back.{" "}
+                  <code className="mode-code">ONLY_IN_CLOUD</code>
                 </p>
               </div>
             </div>
@@ -966,7 +991,8 @@ export default function App() {
                             </div>
                           ) : (
                             <div className="callout callout-red" style={{ padding: "8px 10px", fontSize: 12 }}>
-                              <strong>{customEocCheck.refusal}:</strong> {customEocCheck.reason}
+                              <strong>Blocked before sending:</strong> {customEocCheck.reason}{" "}
+                              <code className="mode-code">{customEocCheck.refusal}</code>
                             </div>
                           ))}
                       </>
@@ -979,21 +1005,30 @@ export default function App() {
                     const checked = enabledKeys.includes(field.key);
                     const val = (effectiveAllowlist || proposedAllowlist)[field.key];
                     if (val === undefined || val === null || val === "") return null;
+                    const hintId = `allowlist-hint-${field.key}`;
                     return (
                       <label key={field.key} className={`allowlist-row ${checked ? "" : "unchecked"}`}>
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleAllowlistKey(field.key)}
+                          aria-describedby={hintId}
                         />
                         <div className="allowlist-row-main">
                           <div className="allowlist-row-top">
-                            <span className="allowlist-label">{field.label}</span>
-                            <span className="allowlist-val">
-                              {field.kind === "integer" ? `${val} days` : String(val)}
+                            <span className="allowlist-label" title={field.shortHint}>
+                              {field.label}
+                            </span>
+                            <span className="allowlist-val" title={String(val)}>
+                              {field.kind === "integer"
+                                ? `${val} days`
+                                : field.kind === "enum"
+                                  ? humanizeValue(String(val))
+                                  : String(val)}
                             </span>
                           </div>
-                          <div className="allowlist-hint">
+                          {/* Checked rows stay one line; the hint remains available to screen readers. */}
+                          <div id={hintId} className={checked ? "sr-only" : "allowlist-hint"}>
                             {checked ? field.shortHint : field.removalConsequence}
                           </div>
                         </div>
@@ -1017,9 +1052,9 @@ export default function App() {
                         fontSize: 12
                       }}
                     >
-                      <span>
-                        <strong>Deterministic Code Gate:</strong> 0 local identifiers matched ·{" "}
-                        <code>{liveGate.serialized.length} bytes</code> JSON
+                      <span title="Deterministic code gate: 0 local identifiers matched in the serialized payload">
+                        <strong>Privacy check passed:</strong> none of your personal details are in this{" "}
+                        <code>{liveGate.serialized.length}-byte</code> request.
                       </span>
                       <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("wire")}>
                         Inspect Raw JSON
@@ -1027,7 +1062,8 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="callout callout-red">
-                      <strong>{liveGate.refusal}:</strong> {liveGate.reason}
+                      <strong>Blocked before sending:</strong> {liveGate.reason}{" "}
+                      <code className="mode-code">{liveGate.refusal}</code>
                     </div>
                   ))}
               </>
@@ -1044,7 +1080,7 @@ export default function App() {
                 >
                   {analyzingCloud && <span className="spinner" />}
                   {analyzingCloud
-                    ? cloudRetryNote || "Analyzing Allowlist in Cloud..."
+                    ? cloudRetryNote || "Matching your plan in the cloud…"
                     : planIdEnabled
                       ? "Match Policy Clause in Cloud"
                       : "Get General Guidance in Cloud"}
@@ -1068,16 +1104,18 @@ export default function App() {
 
         {/* Offline Fallback Card (if triggered) */}
         {offlineTriage && (
-          <section className="card" style={{ marginBottom: 24 }}>
+          <section ref={offlineRef} className="card scroll-target" style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-              <span className="tag tag-yellow">OFFLINE_LOCAL_TRIAGE · {offlineTriage.source}</span>
+              <span className="tag tag-yellow" title={`OFFLINE_LOCAL_TRIAGE · ${offlineTriage.source}`}>
+                Offline triage · on this device
+              </span>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--ink-muted)" }}>
-                {offlineTriage.httpRequests} HTTP requests · {(offlineTriage.latencyMs / 1000).toFixed(1)}s
+                {offlineTriage.httpRequests} network requests · {(offlineTriage.latencyMs / 1000).toFixed(1)}s
               </span>
             </div>
             <p className="pane-desc" style={{ marginBottom: 10 }}>
-              When connectivity is unavailable, Cleave labels this output explicitly as local-only triage rather than
-              fabricating exact policy clause citations.
+              A quick checklist made without the internet. It doesn&apos;t cite plan sections, because it can&apos;t see
+              your plan offline. <code className="mode-code">OFFLINE_LOCAL_TRIAGE</code>
             </p>
             <div
               className="code-block"
@@ -1090,7 +1128,11 @@ export default function App() {
 
         {/* Step 3: Policy Clause Match, Confirmation Checklist & Re-Joined Draft */}
         {cloudAnalysis && rejoined && (
-          <section className="results-section" aria-label="Policy analysis and editable appeal draft">
+          <section
+            ref={resultsRef}
+            className="results-section scroll-target"
+            aria-label="Policy analysis and editable appeal draft"
+          >
             {cloudMeta &&
               liveGate?.ok &&
               cloudMeta.allowlistSnapshot !== `${liveGate.serialized}|${eocSourceMode}|${customEocText.length}` && (
@@ -1099,8 +1141,8 @@ export default function App() {
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
               >
                 <span>
-                  <strong>Allowlist changed since this result was generated.</strong> Re-run Cloud analysis to update the
-                  policy match and draft for your current field selection.
+                  <strong>What gets sent has changed since this result.</strong> Re-run to update the plan match and
+                  draft for your current selection.
                 </span>
                 <button
                   className="btn btn-primary btn-sm"
@@ -1117,7 +1159,7 @@ export default function App() {
             )}
             <div className="clause-compare-grid">
               <div className="card">
-                <span className="tag tag-green">From Your Local Letter (Never Uploaded)</span>
+                <span className="tag tag-green">From your letter · never uploaded</span>
                 <h3
                   style={{
                     margin: "10px 0 8px",
@@ -1131,9 +1173,12 @@ export default function App() {
                 </h3>
                 <blockquote className="clause-quote">{localDenialSentence}</blockquote>
                 {cloudMeta && (
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--ink-muted)" }}>
-                    Verified wire audit: <strong>{cloudMeta.leakedCanaries}</strong> identifier leaks across{" "}
-                    <strong>{cloudMeta.wireBytes.toLocaleString()} bytes</strong> sent ({cloudMeta.source}).
+                  <div
+                    title={`Verified wire audit (${cloudMeta.source})`}
+                    style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--ink-muted)" }}
+                  >
+                    Checked what was sent: <strong>{cloudMeta.leakedCanaries}</strong> of your personal details in{" "}
+                    <strong>{cloudMeta.wireBytes.toLocaleString()} bytes</strong>.
                   </div>
                 )}
               </div>
@@ -1144,13 +1189,14 @@ export default function App() {
                     className={`tag tag-preserve-case ${
                       cloudAnalysis.mode_used === "POLICY_MATCHED" ? "tag-blue" : "tag-yellow"
                     }`}
+                    title={`${cloudAnalysis.mode_used} · clause ${cloudAnalysis.cited_clause_id || "NONE"}`}
                   >
                     {cloudAnalysis.mode_used === "POLICY_MATCHED"
-                      ? `POLICY MATCHED · Clause ${cloudAnalysis.cited_clause_id}`
-                      : `GENERAL GUIDANCE · Clause ${cloudAnalysis.cited_clause_id || "NONE"}`}
+                      ? `Matched your plan · Section ${cloudAnalysis.cited_clause_id}`
+                      : "General guidance · no plan section"}
                   </span>
                   <span
-                    className={`tag ${
+                    className={`tag tag-preserve-case ${
                       cloudAnalysis.exception_applies === "YES"
                         ? "tag-green"
                         : cloudAnalysis.exception_applies === "CONDITIONAL"
@@ -1159,8 +1205,9 @@ export default function App() {
                             ? "tag-red"
                             : "tag-neutral"
                     }`}
+                    title={`exception_applies: ${cloudAnalysis.exception_applies}`}
                   >
-                    Exception: {cloudAnalysis.exception_applies}
+                    {EXCEPTION_LABELS[cloudAnalysis.exception_applies] ?? humanizeValue(cloudAnalysis.exception_applies)}
                   </span>
                 </div>
 
@@ -1174,8 +1221,8 @@ export default function App() {
                   }}
                 >
                   {cloudAnalysis.cited_clause_quote
-                    ? `Controlling Policy Text (${cloudAnalysis.cited_clause_id})`
-                    : "General Guidance (No Policy Document Matched)"}
+                    ? `What Your Plan Says (Section ${cloudAnalysis.cited_clause_id})`
+                    : "General Guidance"}
                 </h3>
 
                 {cloudAnalysis.cited_clause_quote && (
@@ -1190,8 +1237,12 @@ export default function App() {
               <div className="callout callout-yellow" style={{ padding: 20 }}>
                 {cloudAnalysis.mode_used === "POLICY_MATCHED" ? (
                   <>
-                    <span className="tag tag-yellow" style={{ background: "#ffffff", marginBottom: 6 }}>
-                      NEEDS_PATIENT_CONFIRMATION
+                    <span
+                      className="tag tag-yellow"
+                      style={{ background: "#ffffff", marginBottom: 6 }}
+                      title="NEEDS_PATIENT_CONFIRMATION"
+                    >
+                      Needs your confirmation
                     </span>
                     <h3
                       style={{
@@ -1205,8 +1256,8 @@ export default function App() {
                       Confirm Unresolved Facts Before Sending
                     </h3>
                     <p style={{ margin: 0, fontSize: 13 }}>
-                      The denial letter and policy leave these decisive facts unresolved, so the draft below does not
-                      claim them. Check any fact you can verify to insert its factual statement into your draft.
+                      Your letter doesn&apos;t say whether these are true, so the draft below doesn&apos;t claim them. Tick
+                      any you can confirm and its sentence is added to your draft.
                     </p>
                     <div style={{ marginTop: 12 }}>
                       {cloudAnalysis.confirmation_items.map((item, idx) => (
@@ -1221,7 +1272,7 @@ export default function App() {
                               {item.question}
                             </div>
                             <div style={{ color: "var(--ink-muted)", fontSize: 12, marginTop: 2 }}>
-                              Inserts into draft: &ldquo;{item.draft_statement}&rdquo;
+                              Adds to your draft: &ldquo;{item.draft_statement}&rdquo;
                             </div>
                           </div>
                         </label>
@@ -1231,7 +1282,7 @@ export default function App() {
                 ) : (
                   <>
                     <span className="tag tag-yellow" style={{ background: "#ffffff", marginBottom: 6 }}>
-                      NEXT STEPS WITHOUT PLAN POLICY
+                      Next steps without your plan
                     </span>
                     <h3
                       style={{
@@ -1269,8 +1320,13 @@ export default function App() {
                 }}
               >
                 <div>
-                  <span className="tag tag-green">
-                    Re-Joined Strictly on Device · {rejoined.orphanPlaceholders.length} Orphan Placeholders
+                  <span
+                    className={`tag ${rejoined.orphanPlaceholders.length ? "tag-yellow" : "tag-green"}`}
+                    title={`Re-joined on device · ${rejoined.orphanPlaceholders.length} orphan placeholders`}
+                  >
+                    {rejoined.orphanPlaceholders.length
+                      ? `${rejoined.orphanPlaceholders.length} blanks left to fill`
+                      : "Filled in on this device"}
                   </span>
                   <h3
                     style={{
@@ -1281,12 +1337,11 @@ export default function App() {
                       color: "var(--ink-primary)"
                     }}
                   >
-                    Editable Request for Review
+                    Your Appeal Draft
                   </h3>
                   <p className="pane-desc">
-                    Cloud returned opaque placeholders (<code>[MEMBER_NAME]</code>, <code>[CLAIM_ID]</code>,{" "}
-                    <code>[DENIAL_DATE]</code>); Cleave re-inserted <strong>{rejoined.rejoinedTokens.length}</strong>{" "}
-                    personal identifier(s) locally in browser memory.
+                    The cloud wrote this with blanks like <code>[MEMBER_NAME]</code>; your browser filled in{" "}
+                    <strong>{rejoined.rejoinedTokens.length}</strong> personal details. Edit freely before sending.
                   </p>
                 </div>
 
