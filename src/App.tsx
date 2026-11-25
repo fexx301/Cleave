@@ -103,6 +103,7 @@ export default function App() {
     leakedCanaries: number;
     policyMatched: boolean;
     allowlistSnapshot: string;
+    cachedAt?: number;
   } | null>(null);
   const [offlineTriage, setOfflineTriage] = useState<{
     source: string;
@@ -500,7 +501,7 @@ export default function App() {
     setEnabledKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
 
-  async function handleMatchClauseInCloud() {
+  async function handleMatchClauseInCloud(opts: { bypassCache?: boolean } = {}) {
     if (!firebaseInfo.ready) {
       setActiveModal("settings");
       return;
@@ -531,11 +532,13 @@ export default function App() {
         canariesToAudit: canaries,
         customEoc: activeCustomEoc,
         caseLabel: activeCaseLabel,
+        useCache: !opts.bypassCache,
         onRetry: (n) =>
           setCloudRetryNote(
             `${n.isRateLimit ? "Cloud rate limit" : "Cloud busy"} — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s…`
           )
       });
+      const fromCache = out.cachedAt !== undefined;
 
       const localJoined = rejoinDraftLocally(out.analysis.draft_request_for_review, identityVault);
       // The prompt asks for first-person statements; normalize once so preview and inserted text agree.
@@ -552,7 +555,8 @@ export default function App() {
         wireBytes: out.wireBytes,
         leakedCanaries: out.leakedCanaries.length,
         policyMatched: out.policyMatched,
-        allowlistSnapshot: `${liveGate.serialized}|${eocSourceMode}|${customEocText.length}`
+        allowlistSnapshot: `${liveGate.serialized}|${eocSourceMode}|${customEocText.length}`,
+        cachedAt: out.cachedAt
       });
       setRejoined(localJoined);
       setConfirmedIndices([]);
@@ -574,13 +578,15 @@ export default function App() {
         {
           runId: activeRunId,
           caseLabel: activeCaseLabel,
-          step: out.policyMatched ? "3. Cloud Policy Clause Match" : "3. Cloud General Guidance",
+          step: `${out.policyMatched ? "3. Cloud Policy Clause Match" : "3. Cloud General Guidance"}${fromCache ? " (cached)" : ""}`,
           modeRequested: "only_in_cloud",
-          inferenceSource: "in_cloud",
+          inferenceSource: fromCache ? "local_code" : "in_cloud",
           latencyMs: out.latencyMs,
           httpRequests: out.wireEntries.length,
           bytesSent: out.wireBytes,
-          note: `${out.analysis.mode_used} · clause ${out.analysis.cited_clause_id} · ${out.leakedCanaries.length} identifier leaks.`
+          note: fromCache
+            ? `Reused a saved answer from this browser for identical facts, plan and model (0 HTTP). ${out.analysis.mode_used} · clause ${out.analysis.cited_clause_id}.`
+            : `${out.analysis.mode_used} · clause ${out.analysis.cited_clause_id} · ${out.leakedCanaries.length} identifier leaks.`
         },
         {
           runId: activeRunId,
@@ -1308,7 +1314,7 @@ export default function App() {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   className="btn btn-primary"
-                  onClick={handleMatchClauseInCloud}
+                  onClick={() => handleMatchClauseInCloud()}
                   disabled={analyzingCloud || runningOffline || !liveGate?.ok || customEocBlocked || inReplay}
                 >
                   {analyzingCloud && <span className="spinner" />}
@@ -1378,6 +1384,24 @@ export default function App() {
                 {RECORDED_REPLAY_RUNS[replayCaseKey].recordedAt}. Exit Replay to run Cleave yourself.
               </div>
             )}
+            {!inReplay && cloudMeta?.cachedAt !== undefined && (
+              <div
+                className="callout callout-blue"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+              >
+                <span>
+                  <strong>Saved answer reused:</strong> this browser asked the cloud this exact question on{" "}
+                  {new Date(cloudMeta.cachedAt).toLocaleString()}, so nothing was sent this time.
+                </span>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => handleMatchClauseInCloud({ bypassCache: true })}
+                  disabled={analyzingCloud || runningOffline || customEocBlocked || !liveGate?.ok}
+                >
+                  {analyzingCloud ? cloudRetryNote || "Running live…" : "Run live instead"}
+                </button>
+              </div>
+            )}
             {cloudMeta &&
               liveGate?.ok &&
               cloudMeta.allowlistSnapshot !== `${liveGate.serialized}|${eocSourceMode}|${customEocText.length}` && (
@@ -1393,7 +1417,7 @@ export default function App() {
                 </span>
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={handleMatchClauseInCloud}
+                  onClick={() => handleMatchClauseInCloud()}
                   disabled={analyzingCloud || runningOffline || customEocBlocked || inReplay}
                 >
                   {analyzingCloud && cloudRetryNote
@@ -1424,9 +1448,15 @@ export default function App() {
                     title={`Verified wire audit (${cloudMeta.source})`}
                     style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--ink-muted)" }}
                   >
-                    {inReplay ? "Checked what was sent in the recorded run" : "Checked what was sent"}:{" "}
-                    <strong>{cloudMeta.leakedCanaries}</strong> of your personal details in{" "}
-                    <strong>{cloudMeta.wireBytes.toLocaleString()} bytes</strong>.
+                    {cloudMeta.cachedAt !== undefined && !inReplay ? (
+                      <>Saved answer reused: nothing was sent this time.</>
+                    ) : (
+                      <>
+                        {inReplay ? "Checked what was sent in the recorded run" : "Checked what was sent"}:{" "}
+                        <strong>{cloudMeta.leakedCanaries}</strong> of your personal details in{" "}
+                        <strong>{cloudMeta.wireBytes.toLocaleString()} bytes</strong>.
+                      </>
+                    )}
                   </div>
                 )}
               </div>

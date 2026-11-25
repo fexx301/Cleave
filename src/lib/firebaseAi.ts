@@ -25,6 +25,12 @@ import {
   mergeVaults,
   scanOutboundBodyForCanaries
 } from "./gate";
+import {
+  cloudCacheKey,
+  getCachedCloudAnalysis,
+  parseRetryDelayMs,
+  putCachedCloudAnalysis
+} from "./cloudResilience";
 import type {
   AllowlistKey,
   AllowlistProposal,
@@ -427,6 +433,8 @@ export interface RetryNotice {
   isRateLimit: boolean;
 }
 
+const MAX_RETRY_WAIT_MS = 30_000;
+
 async function callWithTransientRetry<T>(
   fn: () => Promise<T>,
   maxAttempts = 4,
@@ -450,7 +458,15 @@ async function callWithTransientRetry<T>(
         }
         throw err;
       }
-      const delayMs = is429 ? 6000 * attempt : 1500 * attempt;
+      // Wait as long as the server says, not a guess. If that is too long, say so now instead of spinning.
+      const hintMs = is429 ? parseRetryDelayMs(err) : null;
+      if (hintMs !== null && hintMs > MAX_RETRY_WAIT_MS) {
+        throw new Error(
+          `Cloud Gemini free-tier rate limit reached (HTTP 429). The cloud asked to wait ~${Math.ceil(hintMs / 1000)}s. Try again then, or use Offline Local Triage (0 cloud quota).`
+        );
+      }
+      // Jitter keeps several users who hit the limit together from retrying in lockstep.
+      const delayMs = (hintMs ?? (is429 ? 6000 * attempt : 1500 * attempt)) + Math.round(Math.random() * 400);
       onRetry?.({
         nextAttempt: attempt + 1,
         maxAttempts,
@@ -622,6 +638,8 @@ export interface CloudAnalysisOutcome {
   wireBytes: number;
   leakedCanaries: string[];
   analysis: CloudAnalysis;
+  /** Set when the answer was reused from the browser cache: nothing was sent. */
+  cachedAt?: number;
 }
 
 /**
@@ -634,9 +652,11 @@ export async function analyzeAllowlistInCloud(params: {
   customEoc?: PlanEoc | null;
   caseLabel?: string;
   onRetry?: (notice: RetryNotice) => void;
+  /** Reuse an identical earlier answer from the browser cache. Off for the eval, which must measure live runs. */
+  useCache?: boolean;
 }): Promise<CloudAnalysisOutcome> {
   const ai = requireAi();
-  const { allowlistPayload, cloudModel, canariesToAudit = [], customEoc, caseLabel, onRetry } = params;
+  const { allowlistPayload, cloudModel, canariesToAudit = [], customEoc, caseLabel, onRetry, useCache = false } = params;
   const modelName = cloudModel.trim() || DEFAULT_CLOUD_MODEL;
 
   const model = getGenerativeModel(ai, {
@@ -687,6 +707,22 @@ Use ONLY opaque placeholders ([MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DA
 ALLOWLIST CLAIM FACTS (JSON):
 ${JSON.stringify(allowlistPayload, null, 2)}`;
 
+  // crypto.subtle needs a secure context; without it we just skip the cache.
+  const cacheKey = useCache ? await cloudCacheKey(modelName, prompt).catch(() => null) : null;
+  const cached = cacheKey ? getCachedCloudAnalysis(cacheKey) : null;
+  if (cached) {
+    return {
+      inferenceSource: "browser_cache",
+      latencyMs: 0,
+      policyMatched: Boolean(policy),
+      wireEntries: [],
+      wireBytes: 0,
+      leakedCanaries: [],
+      analysis: cached.analysis,
+      cachedAt: cached.savedAt
+    };
+  }
+
   const wireBefore = getWireCount();
   const t0 = performance.now();
   const result = await withWireContext("cleave_production", caseLabel, () =>
@@ -702,6 +738,9 @@ ${JSON.stringify(allowlistPayload, null, 2)}`;
   );
 
   const analysis = JSON.parse(result.response.text()) as CloudAnalysis;
+  if (cacheKey && leakedCanaries.length === 0) {
+    putCachedCloudAnalysis(cacheKey, { analysis, savedAt: Date.now() });
+  }
   return {
     inferenceSource: result.response.inferenceSource || InferenceSource.IN_CLOUD,
     latencyMs,
