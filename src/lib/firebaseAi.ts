@@ -200,7 +200,9 @@ export function loadSavedSettings(): RuntimeSettings {
   const envAppId = import.meta.env.VITE_FIREBASE_APP_ID as string | undefined;
 
   let config: FirebaseWebConfig | null = null;
-  const rawStored = localStorage.getItem(CONFIG_STORAGE_KEY);
+  const rawStored =
+    localStorage.getItem(CONFIG_STORAGE_KEY) ||
+    localStorage.getItem("cleave_probe_firebase_config_v1");
   if (rawStored) {
     try {
       config = parseFirebaseConfigSnippet(rawStored);
@@ -222,6 +224,7 @@ export function loadSavedSettings(): RuntimeSettings {
     config,
     appCheckDebugToken:
       localStorage.getItem(APPCHECK_DEBUG_STORAGE_KEY) ??
+      localStorage.getItem("cleave_probe_appcheck_debug_token_v1") ??
       (import.meta.env.VITE_APPCHECK_DEBUG_TOKEN as string | undefined) ??
       "",
     recaptchaSiteKey:
