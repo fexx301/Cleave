@@ -16,6 +16,53 @@ import type {
 } from "./types";
 
 export const MAX_LOCAL_CHARS = 10000;
+export const MAX_CUSTOM_EOC_CHARS = 40000;
+
+/**
+ * Deterministic safety guard for user-uploaded Custom Plan EOCs:
+ * Plan EOCs are generic policy booklets (safe for cloud), so if a user accidentally drops
+ * their personal denial letter into the EOC slot, block it deterministically before egress!
+ */
+export function verifyCustomEocSafety(rawEocText: string): {
+  ok: true;
+  cleanedText: string;
+} | {
+  ok: false;
+  refusal: RefusalCode;
+  reason: string;
+} {
+  const trimmed = (rawEocText || "").trim();
+  if (!trimmed) {
+    return {
+      ok: false,
+      refusal: "REFUSE_RAW_TEXT_BLOCKED",
+      reason: "Custom Plan EOC text is empty."
+    };
+  }
+  if (trimmed.length > MAX_CUSTOM_EOC_CHARS) {
+    return {
+      ok: false,
+      refusal: "REFUSE_CHUNK_OVERFLOW",
+      reason: `Custom Plan EOC (${trimmed.length.toLocaleString()} chars) exceeds the ${MAX_CUSTOM_EOC_CHARS.toLocaleString()}-char limit. Paste the relevant Referral / Prior Authorization / Appeals sections.`
+    };
+  }
+  const accidentalPersonalPatterns: ReadonlyArray<{ name: string; regex: RegExp }> = [
+    { name: "member_or_claim_id", regex: /\b(?:MBR|CLM)-[A-Z0-9-]{4,}\b/i },
+    { name: "ssn", regex: /\b\d{3}-\d{2}-\d{4}\b/ },
+    { name: "dob_label", regex: /\b(?:Date of Birth|DOB)\s*:\s*(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})/i },
+    { name: "member_name_header", regex: /^(?:Member Name|Patient|Subscriber)\s*:\s*[A-Z][a-zA-Z-]+[ \t]+[A-Z][a-zA-Z-]+/m }
+  ];
+  for (const pat of accidentalPersonalPatterns) {
+    if (pat.regex.test(trimmed)) {
+      return {
+        ok: false,
+        refusal: "REFUSE_RESIDUAL_IDENTIFIER",
+        reason: `Personal identifier pattern (${pat.name}) detected in the Custom Plan EOC box. Did you drop your personal denial letter into the Policy EOC slot by mistake? Egress blocked.`
+      };
+    }
+  }
+  return { ok: true, cleanedText: trimmed };
+}
 
 export const ALLOWLIST_FIELDS: readonly AllowlistFieldMeta[] = [
   {

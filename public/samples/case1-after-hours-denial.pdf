@@ -1,0 +1,56 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 998 >>
+stream
+BT
+/F1 10 Tf
+50 750 Td
+14 TL
+(CLEARPATH HEALTH PLAN - ADVERSE BENEFIT DETERMINATION) Tj
+T* (Notice Date: November 14, 2026) Tj
+T* (Plan Policy: PLAN-HMO-2026-GOLD \(ClearPath Gold HMO\)) Tj
+T* () Tj
+T* (Member Name: Elena Vasquez) Tj
+T* (Date of Birth: 1984-06-14) Tj
+T* (Member ID: MBR-8841209) Tj
+T* (Address: 412 Sycamore Ridge Rd) Tj
+T* (Claim Number: CLM-2026-991042) Tj
+T* () Tj
+T* (Date of Service: November 6, 2026 \(Check-in time: 11:40 PM\)) Tj
+T* (Facility: St. Jude Regional Medical Center \(Out-of-Network Urgent Care Wing\)) Tj
+T* (Attending Clinician: Dr. Marcus Thornton) Tj
+T* (Service Category: After-hours urgent care evaluation for acute ankle injury) Tj
+T* () Tj
+T* (DETERMINATION: DENIED) Tj
+T* (Reason Code: REF-01 \(Missing Primary Care Physician Referral\).) Tj
+T* (Explanation: Our records show no active PCP referral on file prior to your visit) Tj
+T* (on November 6, 2026. Under standard HMO rules, visits without a prior PCP referral) Tj
+T* (are not reimbursed.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001289 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1359
+%%EOF

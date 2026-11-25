@@ -1,11 +1,17 @@
-// 100% Client-Side PDF Text Extraction via pdfjs-dist.
-// Raw PDF bytes stay strictly in browser memory — never passed as inlineData to PREFER_ON_DEVICE
+// 100% Client-Side PDF Text Extraction via pdfjs-dist (legacy build works in both browsers & Node tests).
+// Raw PDF bytes stay strictly in local memory — never passed as inlineData to PREFER_ON_DEVICE
 // (which would silently upload raw PDFs to Google Cloud).
 
-import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
-GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+let workerConfigured = false;
+
+async function ensureBrowserPdfWorker() {
+  if (workerConfigured || typeof window === "undefined") return;
+  const mod = await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url");
+  GlobalWorkerOptions.workerSrc = mod.default;
+  workerConfigured = true;
+}
 
 export interface LocalPdfExtractionResult {
   text: string;
@@ -14,9 +20,17 @@ export interface LocalPdfExtractionResult {
   fileName: string;
 }
 
-export async function extractPdfTextLocally(file: File): Promise<LocalPdfExtractionResult> {
-  const buffer = await file.arrayBuffer();
-  const loadingTask = getDocument({ data: new Uint8Array(buffer) });
+export async function extractPdfTextFromBytes(
+  bytes: Uint8Array,
+  fileName = "document.pdf"
+): Promise<LocalPdfExtractionResult> {
+  await ensureBrowserPdfWorker();
+
+  const loadingTask = getDocument({
+    data: bytes,
+    useWorkerFetch: false,
+    disableFontFace: typeof window === "undefined"
+  });
   const pdf = await loadingTask.promise;
 
   const pageTexts: string[] = [];
@@ -51,7 +65,12 @@ export async function extractPdfTextLocally(file: File): Promise<LocalPdfExtract
   return {
     text: combined,
     pageCount: pdf.numPages,
-    byteLength: buffer.byteLength,
-    fileName: file.name
+    byteLength: bytes.byteLength,
+    fileName
   };
+}
+
+export async function extractPdfTextLocally(file: File): Promise<LocalPdfExtractionResult> {
+  const buffer = await file.arrayBuffer();
+  return extractPdfTextFromBytes(new Uint8Array(buffer), file.name);
 }

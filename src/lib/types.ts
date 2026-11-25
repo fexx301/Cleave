@@ -100,6 +100,8 @@ export interface PlanEoc {
   plan_id: string;
   plan_name: string;
   clauses: PolicyClause[];
+  /** Optional raw generic policy text when the user uploads/pastes their own Plan EOC PDF/text */
+  rawPolicyText?: string;
 }
 
 export interface ConfirmationItem {

@@ -399,7 +399,28 @@ export async function downloadOrWarmNano(onProgress?: (pct: number) => void): Pr
   return checkNanoAvailability();
 }
 
+const SESSION_CLOUD_CALL_CAP = 40;
+let sessionCloudCalls = 0;
+
+export function getSessionCloudCallUsage() {
+  return { used: sessionCloudCalls, cap: SESSION_CLOUD_CALL_CAP };
+}
+
+export function resetSessionCloudCallUsage() {
+  sessionCloudCalls = 0;
+}
+
+function assertWithinSessionQuota() {
+  if (sessionCloudCalls >= SESSION_CLOUD_CALL_CAP) {
+    throw new Error(
+      `Session cloud quota cap reached (${SESSION_CLOUD_CALL_CAP} calls). On-device extraction and Offline Local Triage remain unlimited; reset or supply your own Firebase project in Settings to continue cloud calls.`
+    );
+  }
+  sessionCloudCalls += 1;
+}
+
 async function callWithTransientRetry<T>(fn: () => Promise<T>, maxAttempts = 4): Promise<T> {
+  assertWithinSessionQuota();
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -409,7 +430,14 @@ async function callWithTransientRetry<T>(fn: () => Promise<T>, maxAttempts = 4):
       const msg = String((err as Error)?.message || err);
       const is429 = /\b429\b|rate|quota/i.test(msg);
       const isTransient = is429 || /\b(500|503)\b|high demand|overloaded|temporarily/i.test(msg);
-      if (!isTransient || attempt === maxAttempts) throw err;
+      if (!isTransient || attempt === maxAttempts) {
+        if (is429) {
+          throw new Error(
+            "Cloud Gemini free-tier rate limit reached (HTTP 429). Wait ~30 seconds and retry, switch to Offline Local Triage (0 cloud quota), or configure your own Firebase project in Settings."
+          );
+        }
+        throw err;
+      }
       const delayMs = is429 ? 5000 * attempt : 1500 * attempt;
       await new Promise((r) => setTimeout(r, delayMs));
     }
@@ -597,25 +625,31 @@ export async function analyzeAllowlistInCloud(params: {
   });
 
   const planId = typeof allowlistPayload.plan_id === "string" ? allowlistPayload.plan_id : "";
+  // Respect interactive user control: if the patient unchecked plan_id, withhold even a custom EOC!
   const policy: PlanEoc | null = planId ? customEoc || PLAN_EOCS[planId] || null : null;
+
+  const policyBlock = policy
+    ? policy.rawPolicyText
+      ? `CUSTOM PLAN EOC (${policy.plan_id} — ${policy.plan_name}):\n${policy.rawPolicyText}`
+      : `GENERIC PLAN EOC (${policy.plan_id} — ${policy.plan_name}):\n${JSON.stringify(policy.clauses, null, 2)}`
+    : "";
 
   const prompt = policy
     ? `You are a health insurance policy analyst. You receive ONLY structured non-identifying claim facts and a generic Plan Evidence of Coverage (EOC).
 Rules:
-1. Check whether an EOC exception clause applies AND check the internal appeal filing deadline (Section 8.2 / 9.1: 180 calendar days using days_since_denial).
-2. Cite the exact clause ID(s) and quote the controlling sentence verbatim.
-3. For Section 4.2(a): if service_setting is EMERGENCY_OR_AFTER_HOURS_URGENT AND after_hours_visit_confirmed is YES (and days_since_denial <= 180), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[]. (Chart urgency documentation is ONLY required for Section 5.1(c) imaging, NOT Section 4.2(a) after-hours urgent care.)
-4. For Section 4.3(b) or 4.4(a): if network_status is IN_NETWORK and service_setting matches (and days_since_denial <= 180), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[].
-5. If an exception depends on an unconfirmed fact (such as Section 5.1(c) chart urgency documentation when urgency_documented is NOT YES, OR Section 6.4(a) continuity-of-care when ongoing_treatment is YES and enrollment_date_known is NOT YES), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and populate confirmation_items with pairs of { question, draft_statement }.
+1. Check whether an EOC exception clause applies AND check the internal appeal filing deadline (typically 180 calendar days using days_since_denial, citing the exact appeal deadline section in the EOC below).
+2. Cite the exact clause ID(s) from the EOC below and quote the controlling sentence verbatim.
+3. For Emergency / After-Hours Urgent Care waivers (e.g. Section 4.2(a) or 7.3(a)): if service_setting is EMERGENCY_OR_AFTER_HOURS_URGENT AND after_hours_visit_confirmed is YES (and within the appeal filing window), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[]. (Chart urgency documentation is ONLY required for retroactive imaging prior auth, NOT after-hours urgent care waivers.)
+4. For In-Network Direct Access waivers (OB-GYN or Behavioral Health): if network_status is IN_NETWORK and service_setting matches (and within the appeal filing window), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[].
+5. If an exception depends on an unconfirmed fact (such as chart urgency documentation for retroactive imaging when urgency_documented is NOT YES, OR continuity-of-care when ongoing_treatment is YES and enrollment_date_known is NOT YES), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and populate confirmation_items with pairs of { question, draft_statement }.
 6. STRICT NO-FABRICATION RULE: When needs_patient_confirmation is true, draft_request_for_review MUST NOT assert any unconfirmed fact as already true! Instead, place the exact token [PENDING_PATIENT_CONFIRMATION] in the sentence where the confirmed supporting fact belongs (e.g., "Please review this claim under Section 5.1(c). [PENDING_PATIENT_CONFIRMATION]") so Cleave can swap that token cleanly with the patient's confirmed draft_statement once they check the box. Do NOT write "I will confirm once verified" separately when using [PENDING_PATIENT_CONFIRMATION].
-7. If no exception applies or days_since_denial > 180, set exception_applies="NO", needs_patient_confirmation=false, confirmation_items=[], and cite the controlling rules (e.g. "4.1 / 8.2").
+7. If no exception applies or days_since_denial exceeds the EOC's appeal deadline, set exception_applies="NO", needs_patient_confirmation=false, confirmation_items=[], and cite the controlling rules (e.g. "4.1 / 8.2").
 8. Write draft_request_for_review using ONLY opaque placeholders: [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME].
 
 ALLOWLIST CLAIM FACTS (JSON):
 ${JSON.stringify(allowlistPayload, null, 2)}
 
-GENERIC PLAN EOC (${policy.plan_id} — ${policy.plan_name}):
-${JSON.stringify(policy.clauses, null, 2)}`
+${policyBlock}`
     : `You are a health insurance appeal helper. The patient removed their Plan Policy Identifier, so NO specific Plan Evidence of Coverage is available.
 Set mode_used="GENERAL_GUIDANCE_ONLY", cited_clause_id="NONE", cited_clause_quote="", exception_applies="UNKNOWN_NO_POLICY", needs_patient_confirmation=true.
 In confirmation_items, list 2-3 practical next steps as { question: "concise next-step prompt", draft_statement: "concise factual sentence the member can include if applicable" }.

@@ -29,7 +29,8 @@ import {
   buildAndVerifyOutgoingPayload,
   extractDenialSentenceLocally,
   getDisplayVaultEntries,
-  rejoinDraftLocally
+  rejoinDraftLocally,
+  verifyCustomEocSafety
 } from "./lib/gate";
 import { extractPdfTextLocally } from "./lib/pdf";
 import type {
@@ -38,6 +39,7 @@ import type {
   CloudAnalysis,
   IdentityVault,
   InferenceTrailStep,
+  PlanEoc,
   RefusalCode,
   RejoinedDraft,
   WireEntry
@@ -63,6 +65,14 @@ export default function App() {
   const [letterEditMode, setLetterEditMode] = useState<boolean>(false);
   const [vaultExpanded, setVaultExpanded] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const eocFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Bring-Your-Own Plan EOC state (generic public policy document — guarded against accidental PII!)
+  const [eocSourceMode, setEocSourceMode] = useState<"auto" | "custom">("auto");
+  const [eocDrawerOpen, setEocDrawerOpen] = useState<boolean>(false);
+  const [customEocName, setCustomEocName] = useState<string>("Custom Uploaded Plan EOC");
+  const [customEocText, setCustomEocText] = useState<string>("");
+  const [cleaveStageNote, setCleaveStageNote] = useState<string>("");
 
   // Local ONLY_ON_DEVICE split state
   const [cleaving, setCleaving] = useState(false);
@@ -149,6 +159,21 @@ export default function App() {
     [wireEntries]
   );
 
+  const customEocCheck = useMemo(() => {
+    if (eocSourceMode !== "custom") return null;
+    return verifyCustomEocSafety(customEocText);
+  }, [eocSourceMode, customEocText]);
+
+  const activeCustomEoc: PlanEoc | null = useMemo(() => {
+    if (eocSourceMode !== "custom" || !customEocCheck?.ok) return null;
+    return {
+      plan_id: proposedAllowlist?.plan_id || "CUSTOM-EOC",
+      plan_name: customEocName.trim() || "Custom Uploaded Plan EOC",
+      clauses: [],
+      rawPolicyText: customEocCheck.cleanedText
+    };
+  }, [eocSourceMode, customEocCheck, customEocName, proposedAllowlist?.plan_id]);
+
   function resetOutputs() {
     setLocalError(null);
     setIdentityVault(null);
@@ -201,6 +226,45 @@ export default function App() {
     }
   }
 
+  async function handleCustomEocUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCloudError(null);
+    try {
+      let text = "";
+      if (file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf") {
+        const res = await extractPdfTextLocally(file);
+        text = res.text;
+      } else {
+        text = await file.text();
+      }
+      setEocSourceMode("custom");
+      setCustomEocName(file.name.replace(/\.(pdf|txt)$/i, ""));
+      setCustomEocText(text);
+      setEocDrawerOpen(true);
+    } catch (err) {
+      setCloudError((err as Error)?.message || String(err));
+    } finally {
+      e.target.value = "";
+    }
+  }
+
+  async function handleLoadSampleCustomEoc() {
+    setCloudError(null);
+    try {
+      const resp = await fetch("/samples/sample-custom-eoc.pdf");
+      const blob = await resp.blob();
+      const file = new File([blob], "sample-custom-eoc.pdf", { type: "application/pdf" });
+      const res = await extractPdfTextLocally(file);
+      setEocSourceMode("custom");
+      setCustomEocName("Summit Regional Health PPO (Uploaded Sample PDF)");
+      setCustomEocText(res.text);
+      setEocDrawerOpen(true);
+    } catch (err) {
+      setCloudError(`Could not load sample custom EOC PDF: ${(err as Error)?.message || String(err)}`);
+    }
+  }
+
   function handlePurgeLocalVault() {
     setIdentityVault(null);
     setProposedAllowlist(null);
@@ -222,6 +286,7 @@ export default function App() {
     const nextRunId = `run-${Date.now()}`;
     setActiveRunId(nextRunId);
     setCleaving(true);
+    setCleaveStageNote("1/2 Warming local Gemini Nano & extracting identifiers strictly on-device (0 HTTP calls)...");
     setLocalError(null);
     setCloudError(null);
     setCloudAnalysis(null);
@@ -234,8 +299,14 @@ export default function App() {
       ? BENCHMARK_REFERENCE_DATE
       : new Date().toISOString().slice(0, 10);
 
+    const stageTimer = window.setTimeout(() => {
+      setCleaveStageNote("2/2 Building typed allowlist & verifying deterministic code gate locally...");
+    }, 3500);
+
     const res = await extractOnDevice(rawLetter, refDate);
+    window.clearTimeout(stageTimer);
     setCleaving(false);
+    setCleaveStageNote("");
 
     if (!res.ok) {
       setLocalError({ refusal: res.refusal, message: res.reason });
@@ -302,6 +373,10 @@ export default function App() {
       setCloudError(`${liveGate.refusal}: ${liveGate.reason}`);
       return;
     }
+    if (eocSourceMode === "custom" && planIdEnabled && customEocCheck && !customEocCheck.ok) {
+      setCloudError(`${customEocCheck.refusal}: ${customEocCheck.reason}`);
+      return;
+    }
 
     setAnalyzingCloud(true);
     setCloudError(null);
@@ -316,6 +391,7 @@ export default function App() {
         allowlistPayload: liveGate.payload,
         cloudModel: settings.cloudModel,
         canariesToAudit: canaries,
+        customEoc: activeCustomEoc,
         caseLabel: activeCaseLabel
       });
 
@@ -327,7 +403,7 @@ export default function App() {
         wireBytes: out.wireBytes,
         leakedCanaries: out.leakedCanaries.length,
         policyMatched: out.policyMatched,
-        allowlistSnapshot: liveGate.serialized
+        allowlistSnapshot: `${liveGate.serialized}|${eocSourceMode}|${customEocText.length}`
       });
       setRejoined(localJoined);
       setConfirmedIndices([]);
@@ -506,6 +582,30 @@ export default function App() {
           </p>
         </section>
 
+        {(nanoStatus === "unsupported_browser" || nanoStatus === "unavailable") && (
+          <div
+            className="callout callout-yellow"
+            style={{
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap"
+            }}
+          >
+            <div>
+              <strong>On-device Gemini Nano is unavailable in this browser ({nanoStatus}).</strong> Because Cleave runs
+              fail-closed (<code>ONLY_ON_DEVICE</code>), it refuses to silently send your raw letter to the cloud. Open
+              in <strong>Chrome Desktop 139+</strong> with <code>chrome://flags/#prompt-api</code> enabled — or inspect
+              the <em>Fail-Closed Lab</em> to see why.
+            </div>
+            <button className="btn btn-sm" onClick={() => setActiveModal("lab")}>
+              Open Fail-Closed Lab
+            </button>
+          </div>
+        )}
+
         {!firebaseInfo.ready && (
           <div
             className="callout callout-yellow"
@@ -543,6 +643,14 @@ export default function App() {
               <button className="btn btn-sm" onClick={() => fileInputRef.current?.click()}>
                 <DocumentUploadIcon /> Open Local PDF / .txt
               </button>
+              <a
+                className="btn btn-ghost btn-sm"
+                href="/samples/case1-after-hours-denial.pdf"
+                download="case1-after-hours-denial.pdf"
+                style={{ textDecoration: "none" }}
+              >
+                Sample .pdf
+              </a>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => {
@@ -670,7 +778,7 @@ export default function App() {
               </button>
               <span style={{ fontSize: 12, color: "var(--ink-muted)" }}>
                 {cleaving
-                  ? "First local run can take ~15–20s to warm GPU weights."
+                  ? cleaveStageNote || "First local run can take ~15–20s to warm GPU weights."
                   : "Fail-closed: throws instead of falling back to cloud."}
               </span>
             </div>
@@ -713,16 +821,132 @@ export default function App() {
               </div>
             ) : (
               <>
-                {planIdEnabled && matchedPlan ? (
+                {planIdEnabled && (activeCustomEoc || matchedPlan) ? (
                   <div className="callout callout-green">
-                    <strong>Policy matching enabled:</strong> Cloud Gemini will check your allowlisted facts against{" "}
-                    <code>{matchedPlan.plan_id}</code> ({matchedPlan.plan_name}). Uncheck <em>Plan Policy Identifier</em>{" "}
-                    below to test general guidance without sharing your plan code.
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <div>
+                        <strong>Policy matching enabled:</strong> Cloud Gemini will check your allowlisted facts against{" "}
+                        {activeCustomEoc ? (
+                          <>
+                            custom uploaded EOC <strong>{activeCustomEoc.plan_name}</strong>
+                          </>
+                        ) : (
+                          <>
+                            <code>{matchedPlan!.plan_id}</code> ({matchedPlan!.plan_name})
+                          </>
+                        )}
+                        .
+                      </div>
+                      <button className="btn btn-sm" onClick={() => setEocDrawerOpen((o) => !o)}>
+                        {eocDrawerOpen ? "Hide Policy EOC" : "Use Own EOC / Inspect"}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="callout callout-yellow">
-                    <strong>Plan Policy Identifier removed:</strong> Cleave can no longer match your specific Evidence of
-                    Coverage clauses and will degrade honestly to <em>General Guidance Only</em>.
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <div>
+                        <strong>
+                          {planIdEnabled ? "No matching built-in EOC found:" : "Plan Policy Identifier removed:"}
+                        </strong>{" "}
+                        {planIdEnabled
+                          ? "Upload or paste your own public Plan EOC PDF/text below, or continue with General Guidance Only."
+                          : "Cleave can no longer match your specific Evidence of Coverage clauses and will degrade honestly to General Guidance Only."}
+                      </div>
+                      {planIdEnabled && (
+                        <button className="btn btn-sm" onClick={() => setEocDrawerOpen((o) => !o)}>
+                          {eocDrawerOpen ? "Hide Policy EOC" : "Upload / Paste Own EOC"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {eocDrawerOpen && planIdEnabled && (
+                  <div
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      padding: 12,
+                      background: "var(--bg-recessed)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button
+                          className={`btn btn-sm ${eocSourceMode === "auto" ? "btn-primary" : ""}`}
+                          onClick={() => setEocSourceMode("auto")}
+                        >
+                          Built-in EOC ({matchedPlan?.plan_id || "Auto"})
+                        </button>
+                        <button
+                          className={`btn btn-sm ${eocSourceMode === "custom" ? "btn-primary" : ""}`}
+                          onClick={() => setEocSourceMode("custom")}
+                        >
+                          Bring Your Own EOC (.pdf / .txt)
+                        </button>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <input
+                          ref={eocFileInputRef}
+                          type="file"
+                          accept=".pdf,.txt,application/pdf,text/plain"
+                          onChange={handleCustomEocUpload}
+                          style={{ display: "none" }}
+                        />
+                        <button className="btn btn-sm" onClick={() => eocFileInputRef.current?.click()}>
+                          <DocumentUploadIcon /> Upload EOC PDF
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={handleLoadSampleCustomEoc}>
+                          Try Summit PPO PDF
+                        </button>
+                      </div>
+                    </div>
+
+                    {eocSourceMode === "auto" ? (
+                      matchedPlan ? (
+                        <div style={{ fontSize: 12, color: "var(--ink-body)", maxHeight: 160, overflowY: "auto" }}>
+                          {matchedPlan.clauses.map((cl) => (
+                            <div key={cl.id} style={{ marginBottom: 6 }}>
+                              <code>{cl.id}</code> <strong>{cl.title}:</strong> {cl.text}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="pane-desc">
+                          No built-in EOC matches <code>{proposedAllowlist.plan_id || "this plan"}</code>. Switch to{" "}
+                          <strong>Bring Your Own EOC</strong> above to upload or paste your insurer&apos;s public Evidence of Coverage.
+                        </p>
+                      )
+                    ) : (
+                      <>
+                        <p className="pane-desc">
+                          Generic Evidence of Coverage booklets contain no personal patient identity. Cleave still runs a
+                          deterministic PII check here to block accidental denial-letter uploads.
+                        </p>
+                        <textarea
+                          className="letter-editor"
+                          style={{ minHeight: 120, maxHeight: 200 }}
+                          value={customEocText}
+                          onChange={(e) => setCustomEocText(e.target.value)}
+                          placeholder="Paste your plan's Referral / Prior Authorization / Appeals policy clauses, or click Upload EOC PDF above..."
+                        />
+                        {customEocCheck &&
+                          (customEocCheck.ok ? (
+                            <div className="callout callout-green" style={{ padding: "6px 10px", fontSize: 12 }}>
+                              <strong>Custom EOC verified clean ({customEocCheck.cleanedText.length.toLocaleString()} chars):</strong>{" "}
+                              0 personal identifier patterns detected — ready for Cloud clause matching.
+                            </div>
+                          ) : (
+                            <div className="callout callout-red" style={{ padding: "8px 10px", fontSize: 12 }}>
+                              <strong>{customEocCheck.refusal}:</strong> {customEocCheck.reason}
+                            </div>
+                          ))}
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -843,7 +1067,9 @@ export default function App() {
         {/* Step 3: Policy Clause Match, Confirmation Checklist & Re-Joined Draft */}
         {cloudAnalysis && rejoined && (
           <section className="results-section" aria-label="Policy analysis and editable appeal draft">
-            {cloudMeta && liveGate?.ok && cloudMeta.allowlistSnapshot !== liveGate.serialized && (
+            {cloudMeta &&
+              liveGate?.ok &&
+              cloudMeta.allowlistSnapshot !== `${liveGate.serialized}|${eocSourceMode}|${customEocText.length}` && (
               <div
                 className="callout callout-yellow"
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
