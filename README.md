@@ -73,15 +73,19 @@ Tested live on **Chrome 158 (`nano_v3_gpu_component`)** + **Firebase AI Logic (`
 
 *(Scope limit: synthetic single-page letters and two generic EOCs are used for reproducible evaluation; real-world multi-page scanned insurer letters and end-user demand remain outside what this benchmark proves. Cleave is an administrative policy-clause review aid, not legal or medical advice.)*
 
+- **Why both on-device AI and deterministic code are load-bearing (Defense in Depth):** On-device Gemini Nano / Apple Foundation Models parses unstructured letter prose and messy OCR (names, providers, facilities, and phrasing without fixed `Key: Value` labels), while deterministic code handles calendar-day arithmetic (`days_since_denial`), strict allowlist serialization, explicit cue backstops, and residual-identifier scanning — because a real privacy boundary should never trust a small local LLM to subtract dates or grade its own leaks.
+
 ---
 
 ## Judge Quick Path (60 Seconds to 3 Minutes)
 
-1. **Zero-Setup Live Demo (or Local Run):** Open **[https://cleave-5a82b.web.app](https://cleave-5a82b.web.app)** in **Chrome Desktop 139+** (with `chrome://flags/#prompt-api` enabled) — Firebase and App Check (`App Check: Active`) initialize automatically. Or run locally (`npm install && npm run dev` at `http://localhost:5173`) and paste your own free Spark Firebase Web config in **Settings**.
+1. **Zero-Setup Live Demo (Chrome Desktop 139+ with Gemini Nano):**
+   - Enable `chrome://flags/#prompt-api` → **Enabled** and `chrome://flags/#optimization-guide-on-device-model` → **Enabled BypassPerfRequirement**, relaunch Chrome, then open **[https://cleave-5a82b.web.app](https://cleave-5a82b.web.app)** (if Nano shows `downloadable`, click **Settings → Download Gemini Nano**). Firebase and App Check (`App Check: Active`) initialize automatically.
+   - **Reviewing on Safari, Firefox, or without Gemini Nano downloaded?** Cleave stays strictly fail-closed (`REFUSE_LOCAL_UNAVAILABLE`) on live runs so it never silently uploads raw letters — click **Preview Recorded Run** in the banner (or under the **Proof** menu) to inspect real recorded Chrome 158 runs (Case 1 & Case 3) with live interactive allowlist gate toggles and confirmation checkboxes.
 2. **Happy Path + Interactive Control (60s):** On **Case 1 (After-Hours Urgent Care)**, click **Cleave Letter on Device** (`ONLY_ON_DEVICE`, `0` HTTP requests) → uncheck **Plan Policy Identifier** → click **Get General Guidance in Cloud** (`GENERAL_GUIDANCE_ONLY`) → re-check **Plan Policy Identifier** → click **Match Policy Clause in Cloud** (`POLICY_MATCHED · Clause 4.2(a)` + local re-join).
 3. **Unresolved-Fact Discipline (30s):** Switch to **Case 3 (Retroactive MRI Auth)** → observe `NEEDS_PATIENT_CONFIRMATION` checklist and toggle confirmation to update the local draft.
-4. **Fail-Closed Proof & Wire Audit (60s):** Open **Fail-Closed Lab** → click **Run Live PDF Comparison** (`ONLY_ON_DEVICE` = `0` HTTP calls vs `PREFER_ON_DEVICE` = raw PDF uploaded over HTTPS) and **Trigger All 4 Refusals** → open **Wire Proof** (or Chrome DevTools Network tab) to verify `0` vault identifiers in captured requests.
-5. **Reproducible Benchmark (optional):** Open **6-Case Eval** → click **Run Live 6-Case Suite** and export the timestamped JSON report.
+4. **Fail-Closed Proof & Wire Audit (60s):** Open the **Proof** menu in the top bar → **Fail-Closed PDF Lab** → click **Run Live PDF Comparison** (`ONLY_ON_DEVICE` = `0` HTTP calls vs `PREFER_ON_DEVICE` = raw PDF uploaded over HTTPS) and **Trigger All 4 Refusals** → open **Wire Proof** (or Chrome DevTools Network tab) to verify `0` vault identifiers in captured requests.
+5. **Reproducible Benchmark (optional):** Open **Proof → 6-Case Benchmark** → click **Run Live 6-Case Suite** and export the timestamped JSON report.
 
 ---
 

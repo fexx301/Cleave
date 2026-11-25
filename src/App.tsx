@@ -3,6 +3,7 @@ import { EvalSuiteModal } from "./components/EvalSuiteModal";
 import { FailClosedLabModal } from "./components/FailClosedLabModal";
 import { HighlightedLetter } from "./components/HighlightedLetter";
 import {
+  ChevronDownIcon,
   CleaveLogo,
   CloudSplitIcon,
   DeviceLockIcon,
@@ -35,6 +36,7 @@ import {
 } from "./lib/gate";
 import { EXCEPTION_LABELS, NANO_STATUS_LABELS, humanizeValue, humanizeVaultKey, toMemberVoice } from "./lib/labels";
 import { extractPdfTextLocally } from "./lib/pdf";
+import { RECORDED_REPLAY_RUNS } from "./lib/recordedReplay";
 import type {
   AllowlistKey,
   AllowlistProposal,
@@ -59,6 +61,9 @@ export default function App() {
   }>({ ready: false, projectId: null, appCheckMode: "off" });
   const [nanoStatus, setNanoStatus] = useState<NanoAvailability>("unavailable");
   const [activeModal, setActiveModal] = useState<ModalKey>(null);
+  const [proofMenuOpen, setProofMenuOpen] = useState<boolean>(false);
+  const proofMenuRef = useRef<HTMLDivElement | null>(null);
+  const [replayCaseKey, setReplayCaseKey] = useState<null | "case-1" | "case-3">(null);
 
   // Document & case state (stays strictly in local browser memory)
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(SYNTHETIC_CASES[0].id);
@@ -210,7 +215,26 @@ export default function App() {
     [wireEntries]
   );
 
+  useEffect(() => {
+    if (!proofMenuOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (proofMenuRef.current && !proofMenuRef.current.contains(e.target as Node)) {
+        setProofMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProofMenuOpen(false);
+    };
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [proofMenuOpen]);
+
   function resetOutputs() {
+    setReplayCaseKey(null);
     setLocalError(null);
     setIdentityVault(null);
     setProposedAllowlist(null);
@@ -223,6 +247,77 @@ export default function App() {
     setConfirmedIndices([]);
     setEditableDraft("");
     setEnabledKeys([...ALLOWED_KEYS]);
+  }
+
+  function handleLoadRecordedReplay(key: "case-1" | "case-3") {
+    const snap = RECORDED_REPLAY_RUNS[key];
+    const sample = SYNTHETIC_CASES.find((c) => c.id === snap.caseId);
+    if (!sample) return;
+    const replayRunId = `replay-${key}-${Date.now()}`;
+    const gate = buildAndVerifyOutgoingPayload({
+      proposedAllowlist: snap.proposedAllowlist,
+      enabledKeys: ALLOWED_KEYS,
+      identityVault: snap.identityVault
+    });
+    const localJoined = rejoinDraftLocally(snap.cloudAnalysis.draft_request_for_review, snap.identityVault);
+    const displayEntries = getDisplayVaultEntries(snap.identityVault);
+
+    setProofMenuOpen(false);
+    setSelectedCaseId(sample.id);
+    setRawLetter(sample.raw_letter);
+    setUploadedFileNote(null);
+    setLetterEditMode(false);
+    setEocSourceMode("auto");
+    setLocalError(null);
+    setCloudError(null);
+    setOfflineTriage(null);
+    setReplayCaseKey(key);
+    setIdentityVault(snap.identityVault);
+    setProposedAllowlist(snap.proposedAllowlist);
+    setEnabledKeys([...ALLOWED_KEYS]);
+    setLocalMeta(snap.localMeta);
+    setCloudAnalysis({
+      ...snap.cloudAnalysis,
+      confirmation_items: snap.cloudAnalysis.confirmation_items.map((item) => ({
+        ...item,
+        draft_statement: toMemberVoice(item.draft_statement)
+      }))
+    });
+    setCloudMeta({
+      ...snap.cloudMeta,
+      allowlistSnapshot: `${gate.ok ? gate.serialized : ""}|auto|0`
+    });
+    setRejoined(localJoined);
+    setConfirmedIndices([]);
+    setEditableDraft(appendConfirmedPatientFacts(localJoined.text, []));
+    setSessionVaultSecrets((prev) =>
+      Array.from(new Set([...prev, ...displayEntries.map(([, v]) => v).filter((v) => v.length >= 3)]))
+    );
+    setTrail((prev) => [
+      ...prev,
+      {
+        runId: replayRunId,
+        caseLabel: `Recorded Replay · ${snap.label}`,
+        step: "1. Local Identity Split (Recorded)",
+        modeRequested: "only_on_device",
+        inferenceSource: "on_device",
+        latencyMs: snap.localMeta.latencyMs,
+        httpRequests: 0,
+        bytesSent: 0,
+        note: `Recorded Chrome 158 snapshot: held ${displayEntries.length} identifiers on-device (0 HTTP calls).`
+      },
+      {
+        runId: replayRunId,
+        caseLabel: `Recorded Replay · ${snap.label}`,
+        step: "2. Cloud Policy Match (Recorded)",
+        modeRequested: "only_in_cloud",
+        inferenceSource: "in_cloud",
+        latencyMs: snap.cloudMeta.latencyMs,
+        httpRequests: 1,
+        bytesSent: snap.cloudMeta.wireBytes,
+        note: `Recorded snapshot: ${snap.cloudAnalysis.mode_used} · clause ${snap.cloudAnalysis.cited_clause_id} · 0 leaks.`
+      }
+    ]);
   }
 
   function handleSelectSample(caseId: string) {
@@ -302,6 +397,7 @@ export default function App() {
   }
 
   function handlePurgeLocalVault() {
+    setReplayCaseKey(null);
     setIdentityVault(null);
     setProposedAllowlist(null);
     setLocalMeta(null);
@@ -320,6 +416,7 @@ export default function App() {
       return;
     }
     const nextRunId = `run-${Date.now()}`;
+    setReplayCaseKey(null);
     setActiveRunId(nextRunId);
     setCleaving(true);
     setCleaveStageNote("1/2 Warming up the on-device model and finding your personal details…");
@@ -596,15 +693,83 @@ export default function App() {
           </div>
 
           <nav className="nav-actions" aria-label="Workspace tools">
-            <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("wire")}>
-              Wire Proof ({prodWireCount})
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("lab")}>
-              Fail-Closed Lab
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("eval")}>
-              6-Case Eval
-            </button>
+            <div className="proof-menu-wrap" ref={proofMenuRef}>
+              <button
+                className="btn btn-ghost btn-sm"
+                aria-expanded={proofMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setProofMenuOpen((o) => !o)}
+              >
+                <span>Proof{prodWireCount > 0 ? ` (${prodWireCount})` : ""}</span>
+                <ChevronDownIcon />
+              </button>
+              {proofMenuOpen && (
+                <div className="proof-menu-popover" role="menu" aria-label="Verification and proof tools">
+                  <button
+                    className="proof-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setProofMenuOpen(false);
+                      setActiveModal("wire");
+                    }}
+                  >
+                    <span className="proof-menu-item-top">
+                      <span>Wire Proof</span>
+                      <span className="mode-code">{prodWireCount} req</span>
+                    </span>
+                    <span className="proof-menu-item-desc">
+                      Inspect exact outbound JSON and verify 0 local identifiers on the wire.
+                    </span>
+                  </button>
+                  <button
+                    className="proof-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setProofMenuOpen(false);
+                      setActiveModal("lab");
+                    }}
+                  >
+                    <span className="proof-menu-item-top">
+                      <span>Fail-Closed PDF Lab</span>
+                      <span className="mode-code">4 refusals</span>
+                    </span>
+                    <span className="proof-menu-item-desc">
+                      Live ONLY_ON_DEVICE vs. PREFER_ON_DEVICE PDF upload comparison.
+                    </span>
+                  </button>
+                  <button
+                    className="proof-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setProofMenuOpen(false);
+                      setActiveModal("eval");
+                    }}
+                  >
+                    <span className="proof-menu-item-top">
+                      <span>6-Case Benchmark</span>
+                      <span className="mode-code">50 canaries</span>
+                    </span>
+                    <span className="proof-menu-item-desc">
+                      Run all 6 synthetic cases against a realistic manual-redaction baseline.
+                    </span>
+                  </button>
+                  <div className="proof-menu-divider" />
+                  <button
+                    className="proof-menu-item"
+                    role="menuitem"
+                    onClick={() => handleLoadRecordedReplay("case-1")}
+                  >
+                    <span className="proof-menu-item-top">
+                      <span>Preview Recorded Run</span>
+                      <span className="mode-code">No Nano</span>
+                    </span>
+                    <span className="proof-menu-item-desc">
+                      Explore a frozen Chrome 158 run end-to-end without uploading anything.
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
             <button className="btn btn-sm" onClick={() => setActiveModal("settings")}>
               Settings
             </button>
@@ -629,9 +794,64 @@ export default function App() {
           </p>
         </section>
 
-        {(nanoStatus === "unsupported_browser" || nanoStatus === "unavailable") && (
+        {(nanoStatus === "unsupported_browser" || nanoStatus === "unavailable" || nanoStatus === "downloadable") && (
           <div
             className="callout callout-yellow"
+            style={{
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 14,
+              flexWrap: "wrap"
+            }}
+          >
+            <div style={{ flex: "1 1 380px" }}>
+              <strong>
+                {nanoStatus === "downloadable"
+                  ? "On-device Gemini Nano is ready to download in Chrome."
+                  : "This browser doesn't have on-device Gemini Nano ready."}
+              </strong>{" "}
+              Rather than quietly uploading your letter to the cloud, Cleave fails closed here.{" "}
+              <code className="mode-code">{nanoStatus} · ONLY_ON_DEVICE</code>
+              <details className="setup-details">
+                <summary>How to enable Chrome Gemini Nano (3 steps for live testing)</summary>
+                <ol>
+                  <li>
+                    Open this page in <strong>Google Chrome Desktop 139+</strong>.
+                  </li>
+                  <li>
+                    Visit <code>chrome://flags/#prompt-api</code> (set to <strong>Enabled</strong>) and{" "}
+                    <code>chrome://flags/#optimization-guide-on-device-model</code> (set to{" "}
+                    <strong>Enabled BypassPerfRequirement</strong>), then relaunch Chrome.
+                  </li>
+                  <li>
+                    Open <strong>Settings → Download Gemini Nano</strong> (or check <code>chrome://components</code> →{" "}
+                    <em>Optimization Guide On Device Model</em>).
+                  </li>
+                </ol>
+              </details>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <button className="btn btn-primary btn-sm" onClick={() => handleLoadRecordedReplay("case-1")}>
+                Preview Recorded Run
+              </button>
+              {nanoStatus === "downloadable" ? (
+                <button className="btn btn-sm" onClick={() => setActiveModal("settings")}>
+                  Download Nano
+                </button>
+              ) : (
+                <button className="btn btn-sm" onClick={() => setActiveModal("lab")}>
+                  Fail-Closed Lab
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {replayCaseKey && (
+          <div
+            className="callout callout-blue"
             style={{
               marginBottom: 20,
               display: "flex",
@@ -641,14 +861,23 @@ export default function App() {
               flexWrap: "wrap"
             }}
           >
-            <div>
-              <strong>This browser can&apos;t run the on-device AI Cleave needs.</strong> Rather than upload your letter
-              instead, Cleave stops here. Open it in <strong>Chrome on a desktop computer</strong> to use it, or see the{" "}
-              <em>Fail-Closed Lab</em> for why. <code className="mode-code">{nanoStatus} · ONLY_ON_DEVICE</code>
+            <div style={{ flex: "1 1 380px" }}>
+              <strong>Recorded Replay Mode ({RECORDED_REPLAY_RUNS[replayCaseKey].recordedAt}):</strong>{" "}
+              Viewing a frozen real run so you can test the split highlights, live allowlist gate checkboxes,
+              confirmation swap, and locally re-joined draft without Gemini Nano. Live{" "}
+              <em>Cleave Letter on Device</em> remains strictly fail-closed.
             </div>
-            <button className="btn btn-sm" onClick={() => setActiveModal("lab")}>
-              Open Fail-Closed Lab
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className="btn btn-sm"
+                onClick={() => handleLoadRecordedReplay(replayCaseKey === "case-1" ? "case-3" : "case-1")}
+              >
+                {replayCaseKey === "case-1" ? "Preview Case 3 (Confirmation)" : "Preview Case 1 (Waiver)"}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={resetOutputs}>
+                Exit Replay
+              </button>
+            </div>
           </div>
         )}
 

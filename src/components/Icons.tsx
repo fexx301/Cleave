@@ -77,3 +77,11 @@ export function CloseIcon({ size = 15 }: { size?: number }) {
     </svg>
   );
 }
+
+export function ChevronDownIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M4.25 6.25 8 10l3.75-3.75" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
