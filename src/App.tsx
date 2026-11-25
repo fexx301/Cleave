@@ -54,7 +54,7 @@ export default function App() {
   const [firebaseInfo, setFirebaseInfo] = useState<{
     ready: boolean;
     projectId: string | null;
-    appCheckMode: "off" | "debug_token" | "recaptcha_v3";
+    appCheckMode: "off" | "debug_token" | "recaptcha_enterprise";
   }>({ ready: false, projectId: null, appCheckMode: "off" });
   const [nanoStatus, setNanoStatus] = useState<NanoAvailability>("unavailable");
   const [activeModal, setActiveModal] = useState<ModalKey>(null);

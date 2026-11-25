@@ -15,7 +15,7 @@ interface Props {
   onClose: () => void;
   settings: RuntimeSettings;
   nanoStatus: NanoAvailability;
-  onSettingsSaved: (next: RuntimeSettings, info: { projectId: string; appCheckMode: "off" | "debug_token" | "recaptcha_v3" }) => void;
+  onSettingsSaved: (next: RuntimeSettings, info: { projectId: string; appCheckMode: "off" | "debug_token" | "recaptcha_enterprise" }) => void;
   onCleared: () => void;
   onNanoStatusChange: (next: NanoAvailability) => void;
 }
@@ -145,12 +145,12 @@ export function SettingsModal({
         </div>
 
         <div className="field">
-          <label htmlFor="ac-recaptcha">App Check reCAPTCHA v3 Site Key (optional for deployed domains)</label>
+          <label htmlFor="ac-recaptcha">App Check Fraud Defense / reCAPTCHA Enterprise Site Key (for deployed domains)</label>
           <input
             id="ac-recaptcha"
             value={recaptchaKey}
             onChange={(e) => setRecaptchaKey(e.target.value)}
-            placeholder="Optional reCAPTCHA v3 site key"
+            placeholder="Optional Fraud Defense (reCAPTCHA Enterprise) site key"
           />
         </div>
 

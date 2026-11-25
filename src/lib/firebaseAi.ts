@@ -1,5 +1,5 @@
 import { deleteApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
   getAI,
   getGenerativeModel,
@@ -47,9 +47,9 @@ export const DEFAULT_CLOUD_MODEL =
 
 let activeApp: FirebaseApp | null = null;
 let activeAi: AI | null = null;
-let activeAppCheckMode: "off" | "debug_token" | "recaptcha_v3" = "off";
+let activeAppCheckMode: "off" | "debug_token" | "recaptcha_enterprise" = "off";
 let activeConfigFingerprint: string | null = null;
-let initInFlight: Promise<{ projectId: string; appCheckMode: "off" | "debug_token" | "recaptcha_v3" }> | null = null;
+let initInFlight: Promise<{ projectId: string; appCheckMode: "off" | "debug_token" | "recaptcha_enterprise" }> | null = null;
 
 export interface RuntimeSettings {
   config: FirebaseWebConfig | null;
@@ -254,7 +254,7 @@ export function loadSavedSettings(): RuntimeSettings {
 
 export async function initializeCleaveFirebase(settings: RuntimeSettings): Promise<{
   projectId: string;
-  appCheckMode: "off" | "debug_token" | "recaptcha_v3";
+  appCheckMode: "off" | "debug_token" | "recaptcha_enterprise";
 }> {
   if (!settings.config) {
     throw new Error("Paste your Firebase Web config in Settings first.");
@@ -300,16 +300,16 @@ export async function initializeCleaveFirebase(settings: RuntimeSettings): Promi
 
     if (debugToken) {
       initializeAppCheck(activeApp, {
-        provider: new ReCaptchaV3Provider(recaptchaKey || "debug-placeholder-site-key"),
+        provider: new ReCaptchaEnterpriseProvider(recaptchaKey || "debug-placeholder-site-key"),
         isTokenAutoRefreshEnabled: true
       });
       activeAppCheckMode = "debug_token";
     } else if (recaptchaKey) {
       initializeAppCheck(activeApp, {
-        provider: new ReCaptchaV3Provider(recaptchaKey),
+        provider: new ReCaptchaEnterpriseProvider(recaptchaKey),
         isTokenAutoRefreshEnabled: true
       });
-      activeAppCheckMode = "recaptcha_v3";
+      activeAppCheckMode = "recaptcha_enterprise";
     } else {
       activeAppCheckMode = "off";
     }
