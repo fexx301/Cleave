@@ -148,7 +148,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "PLIST=\"${SRCROOT}/CleaveIOS/GoogleService-Info.plist\"\nif [ -f \"$PLIST\" ]; then\n  cp \"$PLIST\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\n  echo \"Bundled local GoogleService-Info.plist\"\nelse\n  echo \"warning: CleaveIOS/GoogleService-Info.plist not found; app will use in-app Firebase Settings.\"\nfi\n";
+			shellScript = "PLIST=\"${SRCROOT}/CleaveIOS/GoogleService-Info.plist\"\nif [ -f \"$PLIST\" ]; then\n  cp \"$PLIST\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\n  echo \"Bundled local GoogleService-Info.plist\"\nelse\n  echo \"warning: CleaveIOS/GoogleService-Info.plist not found; app will use in-app Firebase Settings.\"\nfi\nTOKEN_FILE=\"${SRCROOT}/CleaveIOS/AppCheckDebugToken.txt\"\nif [ -f \"$TOKEN_FILE\" ]; then\n  cp \"$TOKEN_FILE\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppCheckDebugToken.txt\"\n  echo \"Bundled local gitignored AppCheckDebugToken.txt for Simulator DEBUG\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
