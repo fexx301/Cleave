@@ -27,6 +27,7 @@ import {
   ALLOWLIST_FIELDS,
   appendConfirmedPatientFacts,
   buildAndVerifyOutgoingPayload,
+  detectPlanIdCue,
   extractDenialSentenceLocally,
   getDisplayVaultEntries,
   rejoinDraftLocally,
@@ -85,6 +86,7 @@ export default function App() {
 
   // Cloud ONLY_IN_CLOUD / Offline PREFER_IN_CLOUD separate loading states
   const [analyzingCloud, setAnalyzingCloud] = useState(false);
+  const [cloudRetryNote, setCloudRetryNote] = useState<string>("");
   const [runningOffline, setRunningOffline] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [cloudAnalysis, setCloudAnalysis] = useState<CloudAnalysis | null>(null);
@@ -142,15 +144,48 @@ export default function App() {
       ? "Local Uploaded Letter"
       : "Custom Denial Letter";
 
-  // Live deterministic code gate evaluation whenever checkboxes change
+  const planIdEnabled = enabledKeys.includes("plan_id");
+
+  const customEocCheck = useMemo(() => {
+    if (eocSourceMode !== "custom") return null;
+    return verifyCustomEocSafety(customEocText);
+  }, [eocSourceMode, customEocText]);
+
+  // A refusal from the last Match click is stale once the EOC source or text changes.
+  useEffect(() => setCloudError(null), [eocSourceMode, customEocText]);
+
+  const customEocBlocked =
+    eocSourceMode === "custom" && planIdEnabled && Boolean(customEocCheck && !customEocCheck.ok);
+
+  const activeCustomEoc: PlanEoc | null = useMemo(() => {
+    if (eocSourceMode !== "custom" || !customEocCheck?.ok) return null;
+    const detectedPlanId = detectPlanIdCue(customEocCheck.cleanedText);
+    return {
+      plan_id: detectedPlanId || proposedAllowlist?.plan_id || "CUSTOM-EOC",
+      plan_name: customEocName.trim() || "Custom Uploaded Plan EOC",
+      clauses: [],
+      rawPolicyText: customEocCheck.cleanedText
+    };
+  }, [eocSourceMode, customEocCheck, customEocName, proposedAllowlist?.plan_id]);
+
+  // When a custom EOC carries its own PLAN-... code (e.g. Summit PPO), keep the outgoing allowlist plan_id in sync.
+  const effectiveAllowlist: AllowlistProposal | null = useMemo(() => {
+    if (!proposedAllowlist) return null;
+    if (activeCustomEoc?.plan_id && /^PLAN-[A-Z0-9-]{4,28}$/.test(activeCustomEoc.plan_id)) {
+      return { ...proposedAllowlist, plan_id: activeCustomEoc.plan_id };
+    }
+    return proposedAllowlist;
+  }, [proposedAllowlist, activeCustomEoc]);
+
+  // Live deterministic code gate evaluation whenever checkboxes or custom EOC change
   const liveGate = useMemo(() => {
-    if (!proposedAllowlist || !identityVault) return null;
+    if (!effectiveAllowlist || !identityVault) return null;
     return buildAndVerifyOutgoingPayload({
-      proposedAllowlist,
+      proposedAllowlist: effectiveAllowlist,
       enabledKeys,
       identityVault
     });
-  }, [proposedAllowlist, enabledKeys, identityVault]);
+  }, [effectiveAllowlist, enabledKeys, identityVault]);
 
   const localDenialSentence = useMemo(() => extractDenialSentenceLocally(rawLetter), [rawLetter]);
   const vaultEntries = useMemo(() => getDisplayVaultEntries(identityVault), [identityVault]);
@@ -158,21 +193,6 @@ export default function App() {
     () => wireEntries.filter((e) => e.channel === "cleave_production").length,
     [wireEntries]
   );
-
-  const customEocCheck = useMemo(() => {
-    if (eocSourceMode !== "custom") return null;
-    return verifyCustomEocSafety(customEocText);
-  }, [eocSourceMode, customEocText]);
-
-  const activeCustomEoc: PlanEoc | null = useMemo(() => {
-    if (eocSourceMode !== "custom" || !customEocCheck?.ok) return null;
-    return {
-      plan_id: proposedAllowlist?.plan_id || "CUSTOM-EOC",
-      plan_name: customEocName.trim() || "Custom Uploaded Plan EOC",
-      clauses: [],
-      rawPolicyText: customEocCheck.cleanedText
-    };
-  }, [eocSourceMode, customEocCheck, customEocName, proposedAllowlist?.plan_id]);
 
   function resetOutputs() {
     setLocalError(null);
@@ -208,11 +228,11 @@ export default function App() {
     try {
       if (file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf") {
         const res = await extractPdfTextLocally(file);
+        const sizeLabel =
+          res.byteLength < 1024 ? `${res.byteLength} B` : `${(res.byteLength / 1024).toFixed(1)} KB`;
         setRawLetter(res.text);
         setUploadedFileNote(
-          `Parsed "${res.fileName}" locally in browser (${res.pageCount} page${res.pageCount === 1 ? "" : "s"}, ${Math.round(
-            res.byteLength / 1024
-          )} KB — 0 bytes uploaded)`
+          `Parsed "${res.fileName}" locally in browser (${res.pageCount} page${res.pageCount === 1 ? "" : "s"}, ${sizeLabel} — 0 bytes uploaded)`
         );
       } else {
         const text = await file.text();
@@ -379,6 +399,7 @@ export default function App() {
     }
 
     setAnalyzingCloud(true);
+    setCloudRetryNote("");
     setCloudError(null);
     setOfflineTriage(null);
 
@@ -392,7 +413,11 @@ export default function App() {
         cloudModel: settings.cloudModel,
         canariesToAudit: canaries,
         customEoc: activeCustomEoc,
-        caseLabel: activeCaseLabel
+        caseLabel: activeCaseLabel,
+        onRetry: (n) =>
+          setCloudRetryNote(
+            `${n.isRateLimit ? "Rate limited (429)" : "Cloud busy"} — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s...`
+          )
       });
 
       const localJoined = rejoinDraftLocally(out.analysis.draft_request_for_review, identityVault);
@@ -449,6 +474,7 @@ export default function App() {
       setCloudError((err as Error)?.message || String(err));
     } finally {
       setAnalyzingCloud(false);
+      setCloudRetryNote("");
     }
   }
 
@@ -519,7 +545,6 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
-  const planIdEnabled = enabledKeys.includes("plan_id");
   const matchedPlan =
     proposedAllowlist?.plan_id && PLAN_EOCS[proposedAllowlist.plan_id]
       ? PLAN_EOCS[proposedAllowlist.plan_id]
@@ -631,7 +656,7 @@ export default function App() {
         <section className="intake-bar" aria-label="Denial letter source">
           <div className="intake-header">
             <span className="intake-label">1. Load a Synthetic Sample Denial or Open a Local PDF / Text File</span>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -952,7 +977,7 @@ export default function App() {
                 <div className="allowlist-list">
                   {ALLOWLIST_FIELDS.map((field) => {
                     const checked = enabledKeys.includes(field.key);
-                    const val = proposedAllowlist[field.key];
+                    const val = (effectiveAllowlist || proposedAllowlist)[field.key];
                     if (val === undefined || val === null || val === "") return null;
                     return (
                       <label key={field.key} className={`allowlist-row ${checked ? "" : "unchecked"}`}>
@@ -1015,11 +1040,11 @@ export default function App() {
                 <button
                   className="btn btn-primary"
                   onClick={handleMatchClauseInCloud}
-                  disabled={analyzingCloud || runningOffline || !liveGate?.ok}
+                  disabled={analyzingCloud || runningOffline || !liveGate?.ok || customEocBlocked}
                 >
                   {analyzingCloud && <span className="spinner" />}
                   {analyzingCloud
-                    ? "Analyzing Allowlist in Cloud..."
+                    ? cloudRetryNote || "Analyzing Allowlist in Cloud..."
                     : planIdEnabled
                       ? "Match Policy Clause in Cloud"
                       : "Get General Guidance in Cloud"}
@@ -1080,9 +1105,13 @@ export default function App() {
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleMatchClauseInCloud}
-                  disabled={analyzingCloud || runningOffline}
+                  disabled={analyzingCloud || runningOffline || customEocBlocked}
                 >
-                  {planIdEnabled ? "Re-Run Policy Match" : "Re-Run General Guidance"}
+                  {analyzingCloud && cloudRetryNote
+                    ? cloudRetryNote
+                    : planIdEnabled
+                      ? "Re-Run Policy Match"
+                      : "Re-Run General Guidance"}
                 </button>
               </div>
             )}

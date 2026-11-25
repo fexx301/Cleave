@@ -24,6 +24,8 @@ export async function extractPdfTextFromBytes(
   bytes: Uint8Array,
   fileName = "document.pdf"
 ): Promise<LocalPdfExtractionResult> {
+  // Capture byte length before pdfjs-dist transfers/detaches the underlying ArrayBuffer to its Web Worker
+  const originalByteLength = bytes.byteLength;
   await ensureBrowserPdfWorker();
 
   const loadingTask = getDocument({
@@ -65,7 +67,7 @@ export async function extractPdfTextFromBytes(
   return {
     text: combined,
     pageCount: pdf.numPages,
-    byteLength: bytes.byteLength,
+    byteLength: originalByteLength,
     fileName
   };
 }

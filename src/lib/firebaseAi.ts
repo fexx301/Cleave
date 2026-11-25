@@ -155,7 +155,7 @@ const CLOUD_ANALYSIS_SCHEMA = Schema.object({
     needs_patient_confirmation: Schema.boolean(),
     confirmation_items: Schema.array({
       description:
-        "If needs_patient_confirmation is true, list each unresolved fact as a pair: question (shown to the patient) and draft_statement (a clean first-person factual sentence inserted ONLY if the patient checks the box; never a question).",
+        "If needs_patient_confirmation is true, list each unresolved fact as a pair: question (shown to the patient) and draft_statement (a clean first-person member factual sentence using 'I'/'my' such as 'My ordering physician documented clinical urgency in my medical chart', inserted ONLY if the patient checks the box; never a question and never third-person 'the patient').",
       items: Schema.object({
         properties: {
           question: Schema.string(),
@@ -419,7 +419,18 @@ function assertWithinSessionQuota() {
   sessionCloudCalls += 1;
 }
 
-async function callWithTransientRetry<T>(fn: () => Promise<T>, maxAttempts = 4): Promise<T> {
+export interface RetryNotice {
+  nextAttempt: number;
+  maxAttempts: number;
+  delaySec: number;
+  isRateLimit: boolean;
+}
+
+async function callWithTransientRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 4,
+  onRetry?: (notice: RetryNotice) => void
+): Promise<T> {
   assertWithinSessionQuota();
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -438,7 +449,13 @@ async function callWithTransientRetry<T>(fn: () => Promise<T>, maxAttempts = 4):
         }
         throw err;
       }
-      const delayMs = is429 ? 5000 * attempt : 1500 * attempt;
+      const delayMs = is429 ? 6000 * attempt : 1500 * attempt;
+      onRetry?.({
+        nextAttempt: attempt + 1,
+        maxAttempts,
+        delaySec: Math.round(delayMs / 1000),
+        isRateLimit: is429
+      });
       await new Promise((r) => setTimeout(r, delayMs));
     }
   }
@@ -606,9 +623,10 @@ export async function analyzeAllowlistInCloud(params: {
   canariesToAudit?: readonly string[];
   customEoc?: PlanEoc | null;
   caseLabel?: string;
+  onRetry?: (notice: RetryNotice) => void;
 }): Promise<CloudAnalysisOutcome> {
   const ai = requireAi();
-  const { allowlistPayload, cloudModel, canariesToAudit = [], customEoc, caseLabel } = params;
+  const { allowlistPayload, cloudModel, canariesToAudit = [], customEoc, caseLabel, onRetry } = params;
   const modelName = cloudModel.trim() || DEFAULT_CLOUD_MODEL;
 
   const model = getGenerativeModel(ai, {
@@ -641,7 +659,7 @@ Rules:
 2. Cite the exact clause ID(s) from the EOC below and quote the controlling sentence verbatim.
 3. For Emergency / After-Hours Urgent Care waivers (e.g. Section 4.2(a) or 7.3(a)): if service_setting is EMERGENCY_OR_AFTER_HOURS_URGENT AND after_hours_visit_confirmed is YES (and within the appeal filing window), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[]. (Chart urgency documentation is ONLY required for retroactive imaging prior auth, NOT after-hours urgent care waivers.)
 4. For In-Network Direct Access waivers (OB-GYN or Behavioral Health): if network_status is IN_NETWORK and service_setting matches (and within the appeal filing window), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[].
-5. If an exception depends on an unconfirmed fact (such as chart urgency documentation for retroactive imaging when urgency_documented is NOT YES, OR continuity-of-care when ongoing_treatment is YES and enrollment_date_known is NOT YES), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and populate confirmation_items with pairs of { question, draft_statement }.
+5. If an exception depends on an unconfirmed fact (such as chart urgency documentation for retroactive imaging when urgency_documented is NOT YES, OR continuity-of-care when ongoing_treatment is YES and enrollment_date_known is NOT YES), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and populate confirmation_items with pairs of { question, draft_statement } where draft_statement is strictly in first-person member voice ("I" / "my", e.g., "My ordering physician documented clinical urgency in my medical chart" — never third-person "the patient").
 6. STRICT NO-FABRICATION RULE: When needs_patient_confirmation is true, draft_request_for_review MUST NOT assert any unconfirmed fact as already true! Instead, place the exact token [PENDING_PATIENT_CONFIRMATION] in the sentence where the confirmed supporting fact belongs (e.g., "Please review this claim under Section 5.1(c). [PENDING_PATIENT_CONFIRMATION]") so Cleave can swap that token cleanly with the patient's confirmed draft_statement once they check the box. Do NOT write "I will confirm once verified" separately when using [PENDING_PATIENT_CONFIRMATION].
 7. If no exception applies or days_since_denial exceeds the EOC's appeal deadline, set exception_applies="NO", needs_patient_confirmation=false, confirmation_items=[], and cite the controlling rules (e.g. "4.1 / 8.2").
 8. Write draft_request_for_review using ONLY opaque placeholders: [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME].
@@ -662,7 +680,7 @@ ${JSON.stringify(allowlistPayload, null, 2)}`;
   const wireBefore = getWireCount();
   const t0 = performance.now();
   const result = await withWireContext("cleave_production", caseLabel, () =>
-    callWithTransientRetry(() => model.generateContent(prompt))
+    callWithTransientRetry(() => model.generateContent(prompt), 4, onRetry)
   );
   const latencyMs = Math.round(performance.now() - t0);
   const wireEntries = getWireSlice(wireBefore);
@@ -895,7 +913,8 @@ export async function runFailClosedPdfComparison(cloudModel: string): Promise<{
  */
 export async function runManualBaselineCloud(
   caseObj: SyntheticCase,
-  cloudModel: string
+  cloudModel: string,
+  onRetry?: (notice: RetryNotice) => void
 ): Promise<{
   policyMatched: boolean;
   leakedCanaries: string[];
@@ -931,7 +950,7 @@ ${policy ? `PLAN EOC:\n${JSON.stringify(policy.clauses, null, 2)}` : "PLAN EOC: 
 
   const wireBefore = getWireCount();
   const result = await withWireContext("manual_baseline_eval", `Manual Baseline (${caseObj.id})`, () =>
-    callWithTransientRetry(() => model.generateContent(prompt))
+    callWithTransientRetry(() => model.generateContent(prompt), 4, onRetry)
   );
   const wireReqs = getWireSlice(wireBefore);
   const allWireBodies = wireReqs.map((e) => e.bodyText).join("\n");

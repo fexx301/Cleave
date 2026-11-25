@@ -108,7 +108,13 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
               allowlistPayload: gateRes.payload,
               cloudModel,
               canariesToAudit: c.canaries,
-              caseLabel: `Eval Cleave (${c.id})`
+              caseLabel: `Eval Cleave (${c.id})`,
+              onRetry: (n) =>
+                setProgressLine(
+                  `${i + 1}/${SYNTHETIC_CASES.length} (${c.shortTitle}): ${
+                    n.isRateLimit ? "Rate limited (429)" : "Cloud busy"
+                  } — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s...`
+                )
             });
             const rejoined = rejoinDraftLocally(cloudRes.analysis.draft_request_for_review, localRes.identityVault);
             const score = scoreCaseAgainstGroundTruth(c, cloudRes.analysis);
@@ -134,7 +140,13 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
           }
         }
 
-        const manualRes = await runManualBaselineCloud(c, cloudModel);
+        const manualRes = await runManualBaselineCloud(c, cloudModel, (n) =>
+          setProgressLine(
+            `${i + 1}/${SYNTHETIC_CASES.length} Manual Baseline: ${
+              n.isRateLimit ? "Rate limited (429)" : "Cloud busy"
+            } — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s...`
+          )
+        );
         const manualScore = scoreCaseAgainstGroundTruth(c, manualRes.analysis);
         manualLeaks += manualRes.leakedCanaries.length;
         if (manualScore.clauseMatch) manualClauseMatches += 1;

@@ -431,9 +431,15 @@ body::before {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
+}
+
+/* Text block shrinks to 240px before the action button wraps below it (narrow screens only). */
+.pane-head > div {
+  flex: 1 1 240px;
 }
 
 .pane-title {
