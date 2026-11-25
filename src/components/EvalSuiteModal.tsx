@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BENCHMARK_REFERENCE_DATE, SYNTHETIC_CASES, TOTAL_CANARIES } from "../lib/cases";
 import { analyzeAllowlistInCloud, extractOnDevice, runManualBaselineCloud } from "../lib/firebaseAi";
 import {
@@ -24,6 +24,15 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
   const [progressLine, setProgressLine] = useState<string>("");
   const [summary, setSummary] = useState<SuiteEvalSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -98,7 +107,8 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
             const cloudRes = await analyzeAllowlistInCloud({
               allowlistPayload: gateRes.payload,
               cloudModel,
-              canariesToAudit: c.canaries
+              canariesToAudit: c.canaries,
+              caseLabel: `Eval Cleave (${c.id})`
             });
             const rejoined = rejoinDraftLocally(cloudRes.analysis.draft_request_for_review, localRes.identityVault);
             const score = scoreCaseAgainstGroundTruth(c, cloudRes.analysis);
@@ -124,7 +134,6 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
           }
         }
 
-        // Fair baseline comparison on same cloud model
         const manualRes = await runManualBaselineCloud(c, cloudModel);
         const manualScore = scoreCaseAgainstGroundTruth(c, manualRes.analysis);
         manualLeaks += manualRes.leakedCanaries.length;
@@ -141,7 +150,6 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
         };
 
         caseReports.push(report);
-        // Gentle free-tier RPM spacing
         if (i < SYNTHETIC_CASES.length - 1) {
           await new Promise((r) => setTimeout(r, 2000));
         }
@@ -184,12 +192,20 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="6-Case 50-Identifier Evaluation Suite">
+      <div
+        className="modal-panel"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="6-Case 50-Identifier Evaluation Suite"
+      >
         <div className="modal-head">
           <div>
             <h2 className="modal-title">6-Case / 50-Identifier Benchmark</h2>
             <p className="pane-desc">
-              Runs 6 synthetic missing-referral &amp; prior-auth cases (50 planted personal identifiers) live against both Cleave and a realistic manual-redaction baseline, tracking completed cases, refusals, leaks, and clause accuracy separately.
+              Runs 6 synthetic missing-referral &amp; prior-auth cases (50 planted personal identifiers) live against both
+              Cleave and a realistic manual-redaction baseline, tracking completed cases, refusals, leaks, and clause
+              accuracy separately. Manual-baseline traffic is isolated from Cleave&apos;s production Wire Proof audit.
             </p>
           </div>
           <button className="btn btn-ghost" onClick={onClose} aria-label="Close evaluation suite">
@@ -273,12 +289,17 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
                       <span className={`tag ${r.cleave.leakedCanaries.length === 0 ? "tag-green" : "tag-red"}`}>
                         {r.cleave.leakedCanaries.length} leaks
                       </span>{" "}
-                      {r.cleave.score?.exactPass && <span className="tag tag-green">pass</span>}
+                      <span className={`tag ${r.cleave.score?.exactPass ? "tag-green" : "tag-neutral"}`}>
+                        {r.cleave.score?.exactPass ? "pass" : "miss"}
+                      </span>
                     </td>
                     <td>
                       <code>{r.manualBaseline?.citedClause || "—"}</code> · {r.manualBaseline?.exceptionApplies || "—"} ·{" "}
                       <span className={`tag ${(r.manualBaseline?.leakedCanaries.length || 0) === 0 ? "tag-green" : "tag-red"}`}>
                         {r.manualBaseline?.leakedCanaries.length || 0} leaks
+                      </span>{" "}
+                      <span className={`tag ${r.manualBaseline?.score?.exactPass ? "tag-green" : "tag-neutral"}`}>
+                        {r.manualBaseline?.score?.exactPass ? "pass" : "miss"}
                       </span>
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { runFailClosedPdfComparison } from "../lib/firebaseAi";
 import { ALLOWED_KEYS, buildAndVerifyOutgoingPayload, checkChunkBounds } from "../lib/gate";
+import type { InferenceTrailStep } from "../lib/types";
 import { CloseIcon } from "./Icons";
 
 interface Props {
@@ -9,22 +10,66 @@ interface Props {
   cloudModel: string;
   firebaseReady: boolean;
   onOpenSettings: () => void;
+  onRecordLabTrail: (steps: InferenceTrailStep[]) => void;
 }
 
-export function FailClosedLabModal({ open, onClose, cloudModel, firebaseReady, onOpenSettings }: Props) {
+export function FailClosedLabModal({
+  open,
+  onClose,
+  cloudModel,
+  firebaseReady,
+  onOpenSettings,
+  onRecordLabTrail
+}: Props) {
   const [runningPdf, setRunningPdf] = useState(false);
   const [pdfResult, setPdfResult] = useState<Awaited<ReturnType<typeof runFailClosedPdfComparison>> | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [refusals, setRefusals] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
   async function handleRunPdfComparison() {
     setPdfError(null);
     setRunningPdf(true);
+    const t0 = performance.now();
     try {
       const res = await runFailClosedPdfComparison(cloudModel);
+      const elapsed = Math.round(performance.now() - t0);
       setPdfResult(res);
+      const runId = `lab-${Date.now()}`;
+      onRecordLabTrail([
+        {
+          runId,
+          caseLabel: "Fail-Closed Lab (Synthetic PDF)",
+          step: "Lab A: ONLY_ON_DEVICE",
+          modeRequested: "only_on_device",
+          inferenceSource: "local_code",
+          latencyMs: Math.round(elapsed / 2),
+          httpRequests: res.onlyOnDevice.httpRequests,
+          bytesSent: 0,
+          note: res.onlyOnDevice.verdict
+        },
+        {
+          runId,
+          caseLabel: "Fail-Closed Lab (Synthetic PDF)",
+          step: "Lab B: PREFER_ON_DEVICE (Deliberate Leak Test)",
+          modeRequested: "prefer_on_device",
+          inferenceSource: res.preferOnDevice.httpRequests > 0 ? "in_cloud" : "local_code",
+          latencyMs: Math.round(elapsed / 2),
+          httpRequests: res.preferOnDevice.httpRequests,
+          bytesSent: res.preferOnDevice.bytesSent,
+          note: res.preferOnDevice.verdict
+        }
+      ]);
     } catch (err) {
       setPdfError((err as Error)?.message || String(err));
     } finally {
@@ -57,12 +102,19 @@ export function FailClosedLabModal({ open, onClose, cloudModel, firebaseReady, o
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Fail-Closed Hybrid Lab and Named Refusals">
+      <div
+        className="modal-panel"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Fail-Closed Hybrid Lab and Named Refusals"
+      >
         <div className="modal-head">
           <div>
             <h2 className="modal-title">Fail-Closed Lab &amp; Named Refusals</h2>
             <p className="pane-desc">
-              Why Cleave forbids <code>PREFER_ON_DEVICE</code> on sensitive documents — and enforces four machine-readable refusals in deterministic code.
+              Why Cleave forbids <code>PREFER_ON_DEVICE</code> on sensitive documents — and enforces four
+              machine-readable refusals in deterministic code.
             </p>
           </div>
           <button className="btn btn-ghost" onClick={onClose} aria-label="Close fail-closed lab">
@@ -78,8 +130,10 @@ export function FailClosedLabModal({ open, onClose, cloudModel, firebaseReady, o
                 <code>ONLY_ON_DEVICE</code> vs. <code>PREFER_ON_DEVICE</code> on a Denial PDF
               </h3>
               <p className="pane-desc">
-                In <code>@firebase/ai</code>, Chrome&apos;s on-device adapter accepts JPEG/PNG images, not <code>application/pdf</code>.
-                Passing a denial PDF to <code>PREFER_ON_DEVICE</code> silently uploads the raw PDF Base64 to Google Cloud. Cleave parses PDFs locally with <code>pdfjs-dist</code> and locks extraction to <code>ONLY_ON_DEVICE</code>.
+                In <code>@firebase/ai</code>, Chrome&apos;s on-device adapter accepts JPEG/PNG images, not{" "}
+                <code>application/pdf</code>. Passing a denial PDF to <code>PREFER_ON_DEVICE</code> silently uploads the
+                raw PDF Base64 to Google Cloud. Cleave parses PDFs locally with <code>pdfjs-dist</code> and locks
+                extraction to <code>ONLY_ON_DEVICE</code>.
               </p>
             </div>
             {firebaseReady ? (
@@ -115,6 +169,9 @@ export function FailClosedLabModal({ open, onClose, cloudModel, firebaseReady, o
                 <div style={{ fontSize: 12, marginTop: 6 }}>
                   HTTP Requests: <code>{pdfResult.preferOnDevice.httpRequests}</code> · Raw PDF on Wire:{" "}
                   <code>{String(pdfResult.preferOnDevice.rawPdfBase64LeakedOnWire)}</code>
+                  {pdfResult.preferOnDevice.decodedLeaksFound.length > 0 && (
+                    <> · Base64-decoded leaks: <code>{pdfResult.preferOnDevice.decodedLeaksFound.join(", ")}</code></>
+                  )}
                 </div>
               </div>
             </div>

@@ -28,6 +28,7 @@ import {
   appendConfirmedPatientFacts,
   buildAndVerifyOutgoingPayload,
   extractDenialSentenceLocally,
+  getDisplayVaultEntries,
   rejoinDraftLocally
 } from "./lib/gate";
 import { extractPdfTextLocally } from "./lib/pdf";
@@ -70,9 +71,11 @@ export default function App() {
   const [proposedAllowlist, setProposedAllowlist] = useState<AllowlistProposal | null>(null);
   const [enabledKeys, setEnabledKeys] = useState<AllowlistKey[]>([...ALLOWED_KEYS]);
   const [localMeta, setLocalMeta] = useState<{ source: string; latencyMs: number; httpRequests: number } | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string>("run-init");
 
-  // Cloud ONLY_IN_CLOUD / Offline PREFER_IN_CLOUD result state
+  // Cloud ONLY_IN_CLOUD / Offline PREFER_IN_CLOUD separate loading states
   const [analyzingCloud, setAnalyzingCloud] = useState(false);
+  const [runningOffline, setRunningOffline] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [cloudAnalysis, setCloudAnalysis] = useState<CloudAnalysis | null>(null);
   const [cloudMeta, setCloudMeta] = useState<{
@@ -95,9 +98,10 @@ export default function App() {
   const [editableDraft, setEditableDraft] = useState<string>("");
   const [copiedBanner, setCopiedBanner] = useState(false);
 
-  // Wire spy & provenance trail
+  // Wire spy, provenance trail, and session-wide vault secrets for cross-case audit
   const [wireEntries, setWireEntries] = useState<WireEntry[]>(() => getAllWireEntries());
   const [trail, setTrail] = useState<InferenceTrailStep[]>([]);
+  const [sessionVaultSecrets, setSessionVaultSecrets] = useState<string[]>([]);
 
   useEffect(() => {
     const unsub = subscribeWire(() => setWireEntries(getAllWireEntries()));
@@ -121,6 +125,12 @@ export default function App() {
     [selectedCaseId]
   );
 
+  const activeCaseLabel = activeSampleCase
+    ? `${activeSampleCase.id}: ${activeSampleCase.shortTitle}`
+    : uploadedFileNote
+      ? "Local Uploaded Letter"
+      : "Custom Denial Letter";
+
   // Live deterministic code gate evaluation whenever checkboxes change
   const liveGate = useMemo(() => {
     if (!proposedAllowlist || !identityVault) return null;
@@ -132,13 +142,10 @@ export default function App() {
   }, [proposedAllowlist, enabledKeys, identityVault]);
 
   const localDenialSentence = useMemo(() => extractDenialSentenceLocally(rawLetter), [rawLetter]);
-
-  const vaultEntries = useMemo(
-    () =>
-      Object.entries(identityVault || {}).filter(
-        ([k, v]) => !k.endsWith("_alt") && typeof v === "string" && v.trim().length > 0
-      ) as Array<[string, string]>,
-    [identityVault]
+  const vaultEntries = useMemo(() => getDisplayVaultEntries(identityVault), [identityVault]);
+  const prodWireCount = useMemo(
+    () => wireEntries.filter((e) => e.channel === "cleave_production").length,
+    [wireEntries]
   );
 
   function resetOutputs() {
@@ -211,6 +218,8 @@ export default function App() {
       setActiveModal("settings");
       return;
     }
+    const nextRunId = `run-${Date.now()}`;
+    setActiveRunId(nextRunId);
     setCleaving(true);
     setLocalError(null);
     setCloudError(null);
@@ -232,6 +241,8 @@ export default function App() {
       setTrail((prev) => [
         ...prev,
         {
+          runId: nextRunId,
+          caseLabel: activeCaseLabel,
           step: `Local Split (${res.refusal})`,
           modeRequested: "only_on_device",
           inferenceSource: "local_code",
@@ -244,6 +255,7 @@ export default function App() {
       return;
     }
 
+    const displayEntries = getDisplayVaultEntries(res.identityVault);
     setIdentityVault(res.identityVault);
     setProposedAllowlist(res.proposedAllowlist);
     setEnabledKeys([...ALLOWED_KEYS]);
@@ -255,16 +267,22 @@ export default function App() {
     setLetterEditMode(false);
     setNanoStatus("available");
 
+    // Accumulate session-wide local vault identifiers so Wire Proof audits earlier cases too
+    const nextSecrets = displayEntries.map(([, v]) => v).filter((v) => v.length >= 3);
+    setSessionVaultSecrets((prev) => Array.from(new Set([...prev, ...nextSecrets])));
+
     setTrail((prev) => [
       ...prev,
       {
+        runId: nextRunId,
+        caseLabel: activeCaseLabel,
         step: "1. Local Identity Split",
         modeRequested: "only_on_device",
         inferenceSource: "on_device",
         latencyMs: res.latencyMs,
         httpRequests: res.httpRequestsDuringLocal,
         bytesSent: 0,
-        note: `Held ${Object.keys(res.identityVault).length} identifier(s) locally; proposed allowlist fields.`
+        note: `Held ${displayEntries.length} identifier(s) locally; proposed allowlist fields.`
       }
     ]);
   }
@@ -296,7 +314,8 @@ export default function App() {
       const out = await analyzeAllowlistInCloud({
         allowlistPayload: liveGate.payload,
         cloudModel: settings.cloudModel,
-        canariesToAudit: canaries
+        canariesToAudit: canaries,
+        caseLabel: activeCaseLabel
       });
 
       const localJoined = rejoinDraftLocally(out.analysis.draft_request_for_review, identityVault);
@@ -315,6 +334,8 @@ export default function App() {
       setTrail((prev) => [
         ...prev,
         {
+          runId: activeRunId,
+          caseLabel: activeCaseLabel,
           step: "2. Deterministic Gate",
           modeRequested: "deterministic_code",
           inferenceSource: "local_code",
@@ -324,6 +345,8 @@ export default function App() {
           note: `Serialized ${Object.keys(liveGate.payload).length} allowlist fields (${liveGate.serialized.length} B); 0 local identifiers matched.`
         },
         {
+          runId: activeRunId,
+          caseLabel: activeCaseLabel,
           step: out.policyMatched ? "3. Cloud Policy Clause Match" : "3. Cloud General Guidance",
           modeRequested: "only_in_cloud",
           inferenceSource: "in_cloud",
@@ -333,6 +356,8 @@ export default function App() {
           note: `${out.analysis.mode_used} · clause ${out.analysis.cited_clause_id} · ${out.leakedCanaries.length} identifier leaks.`
         },
         {
+          runId: activeRunId,
+          caseLabel: activeCaseLabel,
           step: "4. Local Draft Re-Join",
           modeRequested: "deterministic_code",
           inferenceSource: "local_code",
@@ -351,13 +376,14 @@ export default function App() {
 
   async function handleOfflineTriage() {
     if (!firebaseInfo.ready || !liveGate?.ok) return;
-    setAnalyzingCloud(true);
+    setRunningOffline(true);
     setCloudError(null);
     try {
       const res = await runOfflineResilientTriage({
         allowlistPayload: liveGate.payload,
         cloudModel: settings.cloudModel,
-        forceSimulateOffline: true
+        forceSimulateOffline: true,
+        caseLabel: activeCaseLabel
       });
       setOfflineTriage({
         source: res.inferenceSource,
@@ -368,6 +394,8 @@ export default function App() {
       setTrail((prev) => [
         ...prev,
         {
+          runId: activeRunId,
+          caseLabel: activeCaseLabel,
           step: "Offline Fallback Triage",
           modeRequested: "prefer_in_cloud",
           inferenceSource: res.offlineDegraded ? "on_device" : "in_cloud",
@@ -380,7 +408,7 @@ export default function App() {
     } catch (err) {
       setCloudError((err as Error)?.message || String(err));
     } finally {
-      setAnalyzingCloud(false);
+      setRunningOffline(false);
     }
   }
 
@@ -390,11 +418,11 @@ export default function App() {
       ? confirmedIndices.filter((i) => i !== index)
       : [...confirmedIndices, index];
     setConfirmedIndices(next);
-    const chosenFacts = next
+    const chosenStatements = next
       .sort((a, b) => a - b)
-      .map((i) => cloudAnalysis.confirmation_questions[i])
-      .filter(Boolean);
-    setEditableDraft(appendConfirmedPatientFacts(rejoined.text, chosenFacts));
+      .map((i) => cloudAnalysis.confirmation_items[i]?.draft_statement)
+      .filter((s): s is string => Boolean(s));
+    setEditableDraft(appendConfirmedPatientFacts(rejoined.text, chosenStatements));
   }
 
   async function handleCopyDraft() {
@@ -444,7 +472,7 @@ export default function App() {
 
           <nav className="nav-actions" aria-label="Workspace tools">
             <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("wire")}>
-              Wire Proof ({wireEntries.length})
+              Wire Proof ({prodWireCount})
             </button>
             <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("lab")}>
               Fail-Closed Lab
@@ -477,9 +505,20 @@ export default function App() {
         </section>
 
         {!firebaseInfo.ready && (
-          <div className="callout callout-yellow" style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div
+            className="callout callout-yellow"
+            style={{
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap"
+            }}
+          >
             <div>
-              <strong>Connect your free Spark Firebase project to run live hybrid inference.</strong> Paste your Web config once in Settings (kept in local browser storage only).
+              <strong>Connect your free Spark Firebase project to run live hybrid inference.</strong> Paste your Web
+              config once in Settings (kept in local browser storage only).
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => setActiveModal("settings")}>
               Open Firebase Setup
@@ -530,7 +569,11 @@ export default function App() {
             ))}
           </div>
 
-          {uploadedFileNote && <div className="callout callout-green" style={{ padding: "8px 12px", fontSize: 12.5 }}>{uploadedFileNote}</div>}
+          {uploadedFileNote && (
+            <div className="callout callout-green" style={{ padding: "8px 12px", fontSize: 12.5 }}>
+              {uploadedFileNote}
+            </div>
+          )}
         </section>
 
         {/* Step 2: Signature Counterfoil Split Workspace */}
@@ -547,10 +590,7 @@ export default function App() {
                   Raw letter text never enters the cloud serializer. Extracted identifiers stay strictly in local memory.
                 </p>
               </div>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setLetterEditMode((m) => !m)}
-              >
+              <button className="btn btn-ghost btn-sm" onClick={() => setLetterEditMode((m) => !m)}>
                 {letterEditMode ? "View Highlights" : "Edit Text"}
               </button>
             </div>
@@ -583,7 +623,14 @@ export default function App() {
                       Local Identity Vault ({vaultEntries.length} held on-device)
                     </strong>
                     {localMeta && (
-                      <span style={{ marginLeft: 8, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--pastel-green-ink)" }}>
+                      <span
+                        style={{
+                          marginLeft: 8,
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 11,
+                          color: "var(--pastel-green-ink)"
+                        }}
+                      >
                         {localMeta.source} · {localMeta.httpRequests} HTTP req · {(localMeta.latencyMs / 1000).toFixed(1)}s
                       </span>
                     )}
@@ -649,19 +696,21 @@ export default function App() {
             </div>
 
             {!proposedAllowlist ? (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 12, padding: "12px 4px" }}>
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 12, padding: "12px 4px" }}>
                 <div className="callout callout-blue">
-                  <strong>Nothing has left your device.</strong> Click <em>Cleave Letter on Device</em> on the left to extract a structured allowlist locally via Chrome Gemini Nano.
+                  <strong>Nothing has left your device.</strong> Click <em>Cleave Letter on Device</em> on the left to
+                  extract a structured allowlist locally via Chrome Gemini Nano.
                 </div>
                 <div style={{ fontSize: 13, color: "var(--ink-muted)" }}>
-                  <p style={{ margin: "0 0 8px" }}>
-                    <strong style={{ color: "var(--ink-primary)" }}>Honest privacy claim:</strong> Even non-identifying claim fields can be sensitive health information or narrow identity in combination. Cleave never hides what it sends — every outgoing value is shown here in plain English before transmission.
+                  <p style={{ margin: 0 }}>
+                    <strong style={{ color: "var(--ink-primary)" }}>Honest privacy claim:</strong> Even non-identifying
+                    claim fields can be sensitive health information or narrow identity in combination. Cleave never
+                    hides what it sends — every outgoing value is shown here in plain English before transmission.
                   </p>
                 </div>
               </div>
             ) : (
               <>
-                {/* Live interactive consequence banner */}
                 {planIdEnabled && matchedPlan ? (
                   <div className="callout callout-green">
                     <strong>Policy matching enabled:</strong> Cloud Gemini will check your allowlisted facts against{" "}
@@ -703,10 +752,21 @@ export default function App() {
                   })}
                 </div>
 
-                {/* Deterministic Gate Status */}
                 {liveGate &&
                   (liveGate.ok ? (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 12px", borderRadius: 6, background: "var(--bg-recessed)", border: "1px solid var(--border)", fontSize: 12 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        padding: "8px 12px",
+                        borderRadius: 6,
+                        background: "var(--bg-recessed)",
+                        border: "1px solid var(--border)",
+                        fontSize: 12
+                      }}
+                    >
                       <span>
                         <strong>Deterministic Code Gate:</strong> 0 local identifiers matched ·{" "}
                         <code>{liveGate.serialized.length} bytes</code> JSON
@@ -730,7 +790,7 @@ export default function App() {
                 <button
                   className="btn btn-primary"
                   onClick={handleMatchClauseInCloud}
-                  disabled={analyzingCloud || !liveGate?.ok}
+                  disabled={analyzingCloud || runningOffline || !liveGate?.ok}
                 >
                   {analyzingCloud && <span className="spinner" />}
                   {analyzingCloud
@@ -742,10 +802,11 @@ export default function App() {
                 <button
                   className="btn"
                   onClick={handleOfflineTriage}
-                  disabled={analyzingCloud || !liveGate?.ok}
+                  disabled={analyzingCloud || runningOffline || !liveGate?.ok}
                   title="Demonstrates PREFER_IN_CLOUD fallback labeled honestly as OFFLINE_LOCAL_TRIAGE"
                 >
-                  Offline Local Triage
+                  {runningOffline && <span className="spinner spinner-dark" />}
+                  {runningOffline ? "Running Offline Triage..." : "Offline Local Triage"}
                 </button>
               </div>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-muted)" }}>
@@ -765,9 +826,13 @@ export default function App() {
               </span>
             </div>
             <p className="pane-desc" style={{ marginBottom: 10 }}>
-              When connectivity is unavailable, Cleave labels this output explicitly as local-only triage rather than fabricating exact policy clause citations.
+              When connectivity is unavailable, Cleave labels this output explicitly as local-only triage rather than
+              fabricating exact policy clause citations.
             </p>
-            <div className="code-block" style={{ fontFamily: "var(--font-sans)", fontSize: 13.5 }}>
+            <div
+              className="code-block"
+              style={{ fontFamily: "var(--font-sans)", fontSize: 13.5, lineHeight: 1.65 }}
+            >
               {offlineTriage.summaryText}
             </div>
           </section>
@@ -776,11 +841,18 @@ export default function App() {
         {/* Step 3: Policy Clause Match, Confirmation Checklist & Re-Joined Draft */}
         {cloudAnalysis && rejoined && (
           <section className="results-section" aria-label="Policy analysis and editable appeal draft">
-            {/* Side-by-side Denial Sentence vs Cited Policy Clause */}
             <div className="clause-compare-grid">
               <div className="card">
                 <span className="tag tag-green">From Your Local Letter (Never Uploaded)</span>
-                <h3 style={{ margin: "10px 0 8px", fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 500, color: "var(--ink-primary)" }}>
+                <h3
+                  style={{
+                    margin: "10px 0 8px",
+                    fontFamily: "var(--font-serif)",
+                    fontSize: 20,
+                    fontWeight: 500,
+                    color: "var(--ink-primary)"
+                  }}
+                >
                   Insurer&apos;s Denial Sentence
                 </h3>
                 <blockquote className="clause-quote">{localDenialSentence}</blockquote>
@@ -794,10 +866,14 @@ export default function App() {
 
               <div className="card">
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                  <span className={`tag ${cloudAnalysis.mode_used === "POLICY_MATCHED" ? "tag-blue" : "tag-yellow"}`}>
+                  <span
+                    className={`tag tag-preserve-case ${
+                      cloudAnalysis.mode_used === "POLICY_MATCHED" ? "tag-blue" : "tag-yellow"
+                    }`}
+                  >
                     {cloudAnalysis.mode_used === "POLICY_MATCHED"
-                      ? `Policy Matched · Clause ${cloudAnalysis.cited_clause_id}`
-                      : "General Guidance Only · No Policy ID Sent"}
+                      ? `POLICY MATCHED · Clause ${cloudAnalysis.cited_clause_id}`
+                      : `GENERAL GUIDANCE · Clause ${cloudAnalysis.cited_clause_id || "NONE"}`}
                   </span>
                   <span
                     className={`tag ${
@@ -814,8 +890,18 @@ export default function App() {
                   </span>
                 </div>
 
-                <h3 style={{ margin: "10px 0 6px", fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 500, color: "var(--ink-primary)" }}>
-                  {cloudAnalysis.cited_clause_quote ? `Controlling Policy Text (${cloudAnalysis.cited_clause_id})` : "General Guidance"}
+                <h3
+                  style={{
+                    margin: "10px 0 6px",
+                    fontFamily: "var(--font-serif)",
+                    fontSize: 20,
+                    fontWeight: 500,
+                    color: "var(--ink-primary)"
+                  }}
+                >
+                  {cloudAnalysis.cited_clause_quote
+                    ? `Controlling Policy Text (${cloudAnalysis.cited_clause_id})`
+                    : "General Guidance (No Policy Document Matched)"}
                 </h3>
 
                 {cloudAnalysis.cited_clause_quote && (
@@ -825,48 +911,108 @@ export default function App() {
               </div>
             </div>
 
-            {/* Interactive Patient Confirmation Card (Astra Point 1) */}
-            {cloudAnalysis.needs_patient_confirmation && cloudAnalysis.confirmation_questions.length > 0 && (
+            {/* Confirmation Card: Interactive factual checkboxes for POLICY_MATCHED; calm next-step list for GENERAL_GUIDANCE_ONLY */}
+            {cloudAnalysis.needs_patient_confirmation && cloudAnalysis.confirmation_items.length > 0 && (
               <div className="callout callout-yellow" style={{ padding: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                  <div>
+                {cloudAnalysis.mode_used === "POLICY_MATCHED" ? (
+                  <>
                     <span className="tag tag-yellow" style={{ background: "#ffffff", marginBottom: 6 }}>
                       NEEDS_PATIENT_CONFIRMATION
                     </span>
-                    <h3 style={{ margin: "4px 0 4px", fontFamily: "var(--font-serif)", fontSize: 20, fontWeight: 500, color: "#6e4a00" }}>
+                    <h3
+                      style={{
+                        margin: "4px 0 4px",
+                        fontFamily: "var(--font-serif)",
+                        fontSize: 20,
+                        fontWeight: 500,
+                        color: "#6e4a00"
+                      }}
+                    >
                       Confirm Unresolved Facts Before Sending
                     </h3>
                     <p style={{ margin: 0, fontSize: 13 }}>
-                      The denial letter and policy leave these decisive facts unresolved. Cleave refuses to invent them — check any statement you can verify to include it in your draft below.
+                      The denial letter and policy leave these decisive facts unresolved, so the draft below does not
+                      claim them. Check any fact you can verify to insert its factual statement into your draft.
                     </p>
-                  </div>
-                </div>
-                <div style={{ marginTop: 12 }}>
-                  {cloudAnalysis.confirmation_questions.map((q, idx) => (
-                    <label key={idx} className="confirm-item">
-                      <input
-                        type="checkbox"
-                        checked={confirmedIndices.includes(idx)}
-                        onChange={() => handleToggleConfirmation(idx)}
-                      />
-                      <span style={{ color: "var(--ink-primary)", fontSize: 13.5 }}>{q}</span>
-                    </label>
-                  ))}
-                </div>
+                    <div style={{ marginTop: 12 }}>
+                      {cloudAnalysis.confirmation_items.map((item, idx) => (
+                        <label key={idx} className="confirm-item">
+                          <input
+                            type="checkbox"
+                            checked={confirmedIndices.includes(idx)}
+                            onChange={() => handleToggleConfirmation(idx)}
+                          />
+                          <div>
+                            <div style={{ color: "var(--ink-primary)", fontSize: 13.5, fontWeight: 500 }}>
+                              {item.question}
+                            </div>
+                            <div style={{ color: "var(--ink-muted)", fontSize: 12, marginTop: 2 }}>
+                              Inserts into draft: &ldquo;{item.draft_statement}&rdquo;
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="tag tag-yellow" style={{ background: "#ffffff", marginBottom: 6 }}>
+                      NEXT STEPS WITHOUT PLAN POLICY
+                    </span>
+                    <h3
+                      style={{
+                        margin: "4px 0 6px",
+                        fontFamily: "var(--font-serif)",
+                        fontSize: 20,
+                        fontWeight: 500,
+                        color: "#6e4a00"
+                      }}
+                    >
+                      What to Check Before Filing
+                    </h3>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: "var(--ink-primary)", fontSize: 13.5 }}>
+                      {cloudAnalysis.confirmation_items.map((item, idx) => (
+                        <li key={idx} style={{ marginBottom: 6 }}>
+                          {item.question}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </div>
             )}
 
             {/* Locally Re-Joined Editable Request for Review */}
             <div className="card">
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  marginBottom: 14
+                }}
+              >
                 <div>
-                  <span className="tag tag-green">Re-Joined Strictly on Device · {rejoined.orphanPlaceholders.length} Orphan Placeholders</span>
-                  <h3 style={{ margin: "8px 0 4px", fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 500, color: "var(--ink-primary)" }}>
+                  <span className="tag tag-green">
+                    Re-Joined Strictly on Device · {rejoined.orphanPlaceholders.length} Orphan Placeholders
+                  </span>
+                  <h3
+                    style={{
+                      margin: "8px 0 4px",
+                      fontFamily: "var(--font-serif)",
+                      fontSize: 22,
+                      fontWeight: 500,
+                      color: "var(--ink-primary)"
+                    }}
+                  >
                     Editable Request for Review
                   </h3>
                   <p className="pane-desc">
-                    Cloud returned opaque placeholders (<code>[MEMBER_NAME]</code>, <code>[CLAIM_ID]</code>, <code>[DENIAL_DATE]</code>); Cleave re-inserted{" "}
-                    <strong>{rejoined.rejoinedTokens.length}</strong> personal identifier(s) locally in browser memory.
+                    Cloud returned opaque placeholders (<code>[MEMBER_NAME]</code>, <code>[CLAIM_ID]</code>,{" "}
+                    <code>[DENIAL_DATE]</code>); Cleave re-inserted <strong>{rejoined.rejoinedTokens.length}</strong>{" "}
+                    personal identifier(s) locally in browser memory.
                   </p>
                 </div>
 
@@ -898,7 +1044,8 @@ export default function App() {
 
         <footer className="footer-note">
           <span>
-            Cleave is an administrative policy-clause review tool, not legal or medical advice. Built for #BuildHybridAI 2026 with Firebase AI Logic.
+            Cleave is an administrative policy-clause review tool, not legal or medical advice. Built for #BuildHybridAI
+            2026 with Firebase AI Logic.
           </span>
           <span>
             Press <kbd>Cmd</kbd>+<kbd>Opt</kbd>+<kbd>I</kbd> &rarr; Network to cross-check wire traffic independently.
@@ -928,6 +1075,7 @@ export default function App() {
         wireEntries={wireEntries}
         trail={trail}
         identityVault={identityVault}
+        sessionVaultSecrets={sessionVaultSecrets}
       />
 
       <FailClosedLabModal
@@ -936,6 +1084,7 @@ export default function App() {
         cloudModel={settings.cloudModel}
         firebaseReady={firebaseInfo.ready}
         onOpenSettings={() => setActiveModal("settings")}
+        onRecordLabTrail={(steps) => setTrail((prev) => [...prev, ...steps])}
       />
 
       <EvalSuiteModal

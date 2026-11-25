@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   clearSavedFirebaseSettings,
   DEFAULT_CLOUD_MODEL,
@@ -40,6 +40,15 @@ export function SettingsModal({
   const [saving, setSaving] = useState(false);
   const [downloadPct, setDownloadPct] = useState<number | null>(null);
   const [warming, setWarming] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
