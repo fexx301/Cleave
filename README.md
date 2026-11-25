@@ -7,7 +7,9 @@
 **Understand why this claim was denied and draft a response without uploading the original letter.**
 *Split the secret from the math. Re-join only on your device.*
 
-Built for **#BuildHybridAI 2026** using **Firebase AI Logic Hybrid Inference** (Chrome Built-in Gemini Nano + Cloud Gemini Developer API + Firebase App Check).
+Built for **#BuildHybridAI 2026** across **two platforms** using **Firebase AI Logic Hybrid Inference**:
+- **Chrome Web (`@firebase/ai` v12.13+):** Chrome Built-in Gemini Nano (`ONLY_ON_DEVICE`) + Cloud Gemini (`ONLY_IN_CLOUD`) + Offline Fallback (`PREFER_IN_CLOUD`) + Firebase App Check.
+- **Native iOS 27 SwiftUI (`ios/`, `FirebaseAILogic` `13.2.0` + Apple `FoundationModels`):** Apple Foundation Models (`SystemLanguageModel(guardrails: .permissiveContentTransformations)` on-device, 0 HTTP) + Cloud `FirebaseAI.firebaseAI().geminiLanguageModel(name: "gemini-3.5-flash-lite")` inside Apple's unified `LanguageModelSession` (`@Generable`) + `PDFKit` local PDF parsing + `FirebaseAppCheck`.
 
 ---
 
@@ -44,7 +46,8 @@ Most hybrid AI apps pick **local OR cloud per request** and display a fallback b
 | `InferenceMode.ONLY_IN_CLOUD` + `responseSchema` | `src/lib/firebaseAi.ts` (`analyzeAllowlistInCloud`) | Exact Evidence of Coverage clause matching, unresolved-fact detection (`NEEDS_PATIENT_CONFIRMATION`), and structured placeholder draft generation break. |
 | `InferenceMode.PREFER_IN_CLOUD` | `src/lib/firebaseAi.ts` (`runOfflineResilientTriage`) | Offline-resilient degraded triage (`OFFLINE_LOCAL_TRIAGE`) breaks when connectivity drops. |
 | `response.inferenceSource` | `src/lib/firebaseAi.ts` + `WireProofModal.tsx` | Verifiable provenance trail stamping `on_device` vs `in_cloud` on every step breaks. |
-| `Firebase App Check` (`ReCaptchaV3Provider` / debug token) | `src/lib/firebaseAi.ts` (`initializeCleaveFirebase`) | Client-side cloud inference calls lack attestation against quota abuse. |
+| `Firebase App Check` (`ReCaptchaV3Provider` / `AppAttestProviderFactory` / debug tokens) | `src/lib/firebaseAi.ts` + `ios/CleaveIOS/Sources/CleaveIOSApp.swift` | Client-side cloud inference calls lack attestation against quota abuse across Web and iOS. |
+| `FirebaseAILogic` `13.2.0` `GeminiLanguageModel` + Apple `FoundationModels` | `ios/CleaveIOS/Sources/HybridEngine.swift` | Native iOS 27 dual-runtime parity (on-device `SystemLanguageModel` + cloud `GeminiLanguageModel` sharing Apple's unified `LanguageModelSession` & `@Generable` contract). |
 
 ---
 
@@ -56,6 +59,15 @@ Tested live on **Chrome 158 (`nano_v3_gpu_component`)** + **Firebase AI Logic (`
 - **Completed cases / false refusals (tracked separately):** **6 / 6** completed, **0 / 6** false refusals, **4 / 4** valid named refusals (including live `PREFER_ON_DEVICE` Base64 PDF leak proof vs `ONLY_ON_DEVICE` 0-HTTP fail-closed proof).
 - **Exact ground-truth pass (clause + exception status + unresolved-fact confirmation):** **6 / 6** in the hardened Cleave Chrome Web rehearsal (up from 5 / 6 in the pre-build probe) vs **2 / 6** (3 / 6 in probe) for realistic manual redaction.
 - **Orphan placeholders after local re-join:** **0** across all 6 cases.
+
+### Verified Native iOS 27 Twin (`ios/`, observed 2026-11-25 on iPhone 18 Pro Simulator · iOS 27.2)
+- **Dual-runtime proof:** Same deterministic allowlist gate, 6 synthetic cases + Summit PPO custom EOC, and 4 named refusals running natively in SwiftUI with **Apple Foundation Models** on-device (`0` HTTP calls, `~1.1–2.8s`) and **`FirebaseAILogic` `13.2.0` (`GeminiLanguageModel`)** in cloud.
+- **Second Constraint-as-Evidence finding:** Observed live that Apple's default `SystemLanguageModel.default` guardrails refuse raw medical denial letters (`guardrailViolation: May contain sensitive content`). Cleave iOS resolves this strictly on-device by extracting the local identity vault first, stripping personal & clinical phrases locally, and invoking `SystemLanguageModel(useCase: .general, guardrails: .permissiveContentTransformations)` at `temperature: 0.0` (never falling back to cloud).
+- **Live Simulator verification:**
+  - `Case 1`: **9** vault identifiers held on-device (`2.76s`, `0` HTTP) → `FirebaseAILogic` matched **`Clause 4.2(a)` (`YES`)** with **`0` leaks**, **`0` orphan placeholders**, and **6** locally re-joined tokens.
+  - `Case 3`: Matched **`Clause 5.1(c)` (`CONDITIONAL`, `needs_patient_confirmation: true`)** with clean `[PENDING_PATIENT_CONFIRMATION]` slot swap verified.
+  - `Offline Local Triage`: Completed in **`1.11s`** with **`0`** additional cloud requests.
+  - `Deterministic Refusals`: **4 / 4** verified (`REFUSE_CHUNK_OVERFLOW`, `REFUSE_RAW_TEXT_BLOCKED`, `REFUSE_RESIDUAL_IDENTIFIER`, and Custom EOC accidental-PII guard).
 
 *(Scope limit: synthetic single-page letters and two generic EOCs are used for reproducible evaluation; real-world multi-page scanned insurer letters and end-user demand remain outside what this benchmark proves. Cleave is an administrative policy-clause review aid, not legal or medical advice.)*
 
@@ -77,8 +89,9 @@ Tested live on **Chrome 158 (`nano_v3_gpu_component`)** + **Firebase AI Logic (`
 - **Bring Your Own Plan EOC:** Beyond the two built-in plans (`PLAN-HMO-2026-GOLD`, `PLAN-EPO-2026-SELECT`), patients can inspect built-in clauses or upload/paste any generic Plan Evidence of Coverage `.pdf`/`.txt` (sample included: `/samples/sample-custom-eoc.pdf` for Summit Regional Health PPO). Deterministic code (`verifyCustomEocSafety`) still scans uploaded EOCs to block accidental personal denial-letter uploads (`REFUSE_RESIDUAL_IDENTIFIER`). Unchecking `Plan Policy Identifier` withholds even a custom EOC and degrades honestly to `GENERAL_GUIDANCE_ONLY`.
 - **Quota & Public Demo Safeguards:** Enforces a soft client-side session limit (40 cloud calls per browser session; unlimited local on-device extraction and Offline Local Triage) and surfaces clear recovery guidance if the free-tier Gemini Developer API returns `429`.
 
-## Local Development & Firebase Hosting
+## Local Development — Web & Native iOS
 
+### Chrome Web
 ```bash
 npm install
 npm test        # 16 unit tests (deterministic gate, allowlist, Base64 leak scan, real pdfjs-dist PDF extraction)
@@ -87,6 +100,11 @@ npm run dev     # http://localhost:5173
 ```
 
 To configure via environment variables (or bake public read-only Firebase Web config + App Check reCAPTCHA v3 site key into a Firebase Hosting build), copy `.env.example` to `.env.local` (gitignored) and deploy with `npx firebase-tools deploy --only hosting`. Firebase Hosting config and security headers live in [firebase.json](firebase.json).
+
+### Native iOS 27 Companion (`ios/`)
+- Requires **Xcode 27.2+** (Swift 6.4) on an Apple Silicon Mac with Apple Intelligence enabled (or an Apple Intelligence-eligible iOS 27 device; ineligible devices such as iPhone 14 Pro Max fail closed cleanly with `REFUSE_LOCAL_UNAVAILABLE`).
+- Copy `ios/CleaveIOS/GoogleService-Info.plist.example` to `ios/CleaveIOS/GoogleService-Info.plist` (gitignored) using your Firebase iOS app (`com.cleave.ios`) config.
+- Open `ios/CleaveIOS.xcodeproj` in Xcode (Swift Package Manager resolves `firebase-ios-sdk` `13.2.0` automatically) and run the `CleaveIOS` scheme on an iOS 27 Simulator or eligible device.
 
 ## License
 

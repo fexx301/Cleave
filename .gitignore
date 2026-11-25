@@ -7,3 +7,8 @@ dist/
 .DS_Store
 *.log
 cleave-eval-*.json
+ios/CleaveIOS/GoogleService-Info.plist
+ios/build/
+ios/DerivedData/
+*.xcuserdata
+xcuserdata/
