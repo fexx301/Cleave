@@ -7,8 +7,10 @@
 **Understand why this claim was denied and draft a response without uploading the original letter.**
 *Split the secret from the math. Re-join only on your device.*
 
+**Live Hosted Web Demo (Zero-Setup, App Check Enforced):** [https://cleave-5a82b.web.app](https://cleave-5a82b.web.app) *(open in Chrome Desktop 139+ with `chrome://flags/#prompt-api` enabled)*
+
 Built for **#BuildHybridAI 2026** across **two platforms** using **Firebase AI Logic Hybrid Inference**:
-- **Chrome Web (`@firebase/ai` v12.13+):** Chrome Built-in Gemini Nano (`ONLY_ON_DEVICE`) + Cloud Gemini (`ONLY_IN_CLOUD`) + Offline Fallback (`PREFER_IN_CLOUD`) + Firebase App Check.
+- **Chrome Web (`@firebase/ai` v12.13+):** Chrome Built-in Gemini Nano (`ONLY_ON_DEVICE`) + Cloud Gemini (`ONLY_IN_CLOUD`) + Offline Fallback (`PREFER_IN_CLOUD`) + Firebase App Check (`ReCaptchaEnterpriseProvider` / Google Cloud Fraud Defense).
 - **Native iOS 27 SwiftUI (`ios/`, `FirebaseAILogic` `13.2.0` + Apple `FoundationModels`):** Apple Foundation Models (`SystemLanguageModel(guardrails: .permissiveContentTransformations)` on-device, 0 HTTP) + Cloud `FirebaseAI.firebaseAI().geminiLanguageModel(name: "gemini-3.5-flash-lite")` inside Apple's unified `LanguageModelSession` (`@Generable`) + `PDFKit` local PDF parsing + `FirebaseAppCheck`.
 
 ---
@@ -46,7 +48,7 @@ Most hybrid AI apps pick **local OR cloud per request** and display a fallback b
 | `InferenceMode.ONLY_IN_CLOUD` + `responseSchema` | `src/lib/firebaseAi.ts` (`analyzeAllowlistInCloud`) | Exact Evidence of Coverage clause matching, unresolved-fact detection (`NEEDS_PATIENT_CONFIRMATION`), and structured placeholder draft generation break. |
 | `InferenceMode.PREFER_IN_CLOUD` | `src/lib/firebaseAi.ts` (`runOfflineResilientTriage`) | Offline-resilient degraded triage (`OFFLINE_LOCAL_TRIAGE`) breaks when connectivity drops. |
 | `response.inferenceSource` | `src/lib/firebaseAi.ts` + `WireProofModal.tsx` | Verifiable provenance trail stamping `on_device` vs `in_cloud` on every step breaks. |
-| `Firebase App Check` (`ReCaptchaV3Provider` / `AppAttestProviderFactory` / debug tokens) | `src/lib/firebaseAi.ts` + `ios/CleaveIOS/Sources/CleaveIOSApp.swift` | Client-side cloud inference calls lack attestation against quota abuse across Web and iOS. |
+| `Firebase App Check` (`ReCaptchaEnterpriseProvider` / `AppAttestProviderFactory` / debug tokens) | `src/lib/firebaseAi.ts` + `ios/CleaveIOS/Sources/CleaveIOSApp.swift` | Client-side cloud inference calls lack attestation against quota abuse across Web and iOS. |
 | `FirebaseAILogic` `13.2.0` `GeminiLanguageModel` + Apple `FoundationModels` | `ios/CleaveIOS/Sources/HybridEngine.swift` | Native iOS 27 dual-runtime parity (on-device `SystemLanguageModel` + cloud `GeminiLanguageModel` sharing Apple's unified `LanguageModelSession` & `@Generable` contract). |
 
 ---
@@ -75,7 +77,7 @@ Tested live on **Chrome 158 (`nano_v3_gpu_component`)** + **Firebase AI Logic (`
 
 ## Judge Quick Path (60 Seconds to 3 Minutes)
 
-1. **Setup:** Run locally (`npm install && npm run dev`), open `http://localhost:5173` in **Chrome Desktop 139+** (with `chrome://flags/#prompt-api` enabled), open **Settings**, paste a free Spark Firebase Web config (with Firebase AI Logic / Gemini Developer API enabled), and confirm Gemini Nano is `available`.
+1. **Zero-Setup Live Demo (or Local Run):** Open **[https://cleave-5a82b.web.app](https://cleave-5a82b.web.app)** in **Chrome Desktop 139+** (with `chrome://flags/#prompt-api` enabled) — Firebase and App Check (`App Check: Active`) initialize automatically. Or run locally (`npm install && npm run dev` at `http://localhost:5173`) and paste your own free Spark Firebase Web config in **Settings**.
 2. **Happy Path + Interactive Control (60s):** On **Case 1 (After-Hours Urgent Care)**, click **Cleave Letter on Device** (`ONLY_ON_DEVICE`, `0` HTTP requests) → uncheck **Plan Policy Identifier** → click **Get General Guidance in Cloud** (`GENERAL_GUIDANCE_ONLY`) → re-check **Plan Policy Identifier** → click **Match Policy Clause in Cloud** (`POLICY_MATCHED · Clause 4.2(a)` + local re-join).
 3. **Unresolved-Fact Discipline (30s):** Switch to **Case 3 (Retroactive MRI Auth)** → observe `NEEDS_PATIENT_CONFIRMATION` checklist and toggle confirmation to update the local draft.
 4. **Fail-Closed Proof & Wire Audit (60s):** Open **Fail-Closed Lab** → click **Run Live PDF Comparison** (`ONLY_ON_DEVICE` = `0` HTTP calls vs `PREFER_ON_DEVICE` = raw PDF uploaded over HTTPS) and **Trigger All 4 Refusals** → open **Wire Proof** (or Chrome DevTools Network tab) to verify `0` vault identifiers in captured requests.
