@@ -125,14 +125,16 @@ export default function App() {
   // Bring each new result into view; results render below the fold after a long wait.
   const resultsRef = useRef<HTMLElement | null>(null);
   const offlineRef = useRef<HTMLElement | null>(null);
+  const replayBannerRef = useRef<HTMLDivElement | null>(null);
   const scrollIntoViewGently = (el: HTMLElement | null) =>
     el?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
       block: "start"
     });
+  // A recorded replay must land on its "Recorded Replay Mode" banner, never on results that look live.
   useEffect(() => {
-    if (cloudAnalysis) scrollIntoViewGently(resultsRef.current);
-  }, [cloudAnalysis]);
+    if (cloudAnalysis) scrollIntoViewGently(replayCaseKey ? replayBannerRef.current : resultsRef.current);
+  }, [cloudAnalysis, replayCaseKey]);
   useEffect(() => {
     if (offlineTriage) scrollIntoViewGently(offlineRef.current);
   }, [offlineTriage]);
@@ -166,6 +168,8 @@ export default function App() {
       : "Custom Denial Letter";
 
   const planIdEnabled = enabledKeys.includes("plan_id");
+  // Replay shows a recorded run; cloud/offline actions stay off so recorded and live results never mix.
+  const inReplay = replayCaseKey !== null;
 
   const customEocCheck = useMemo(() => {
     if (eocSourceMode !== "custom") return null;
@@ -851,7 +855,8 @@ export default function App() {
 
         {replayCaseKey && (
           <div
-            className="callout callout-blue"
+            ref={replayBannerRef}
+            className="callout callout-blue scroll-target"
             style={{
               marginBottom: 20,
               display: "flex",
@@ -864,8 +869,8 @@ export default function App() {
             <div style={{ flex: "1 1 380px" }}>
               <strong>Recorded Replay Mode ({RECORDED_REPLAY_RUNS[replayCaseKey].recordedAt}):</strong>{" "}
               Viewing a frozen real run so you can test the split highlights, live allowlist gate checkboxes,
-              confirmation swap, and locally re-joined draft without Gemini Nano. Live{" "}
-              <em>Cleave Letter on Device</em> remains strictly fail-closed.
+              confirmation swap, and locally re-joined draft without Gemini Nano. Cloud and offline runs are switched
+              off while replaying; live <em>Cleave Letter on Device</em> remains strictly fail-closed.
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
@@ -1304,7 +1309,7 @@ export default function App() {
                 <button
                   className="btn btn-primary"
                   onClick={handleMatchClauseInCloud}
-                  disabled={analyzingCloud || runningOffline || !liveGate?.ok || customEocBlocked}
+                  disabled={analyzingCloud || runningOffline || !liveGate?.ok || customEocBlocked || inReplay}
                 >
                   {analyzingCloud && <span className="spinner" />}
                   {analyzingCloud
@@ -1316,16 +1321,22 @@ export default function App() {
                 <button
                   className="btn"
                   onClick={handleOfflineTriage}
-                  disabled={analyzingCloud || runningOffline || !liveGate?.ok}
+                  disabled={analyzingCloud || runningOffline || !liveGate?.ok || inReplay}
                   title="Demonstrates PREFER_IN_CLOUD fallback labeled honestly as OFFLINE_LOCAL_TRIAGE"
                 >
                   {runningOffline && <span className="spinner spinner-dark" />}
                   {runningOffline ? "Running Offline Triage..." : "Offline Local Triage"}
                 </button>
               </div>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-muted)" }}>
-                {settings.cloudModel}
-              </span>
+              {inReplay ? (
+                <span style={{ fontSize: 12, color: "var(--ink-muted)" }}>
+                  Off during Replay. Exit Replay to run Cleave live.
+                </span>
+              ) : (
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-muted)" }}>
+                  {settings.cloudModel}
+                </span>
+              )}
             </div>
           </div>
         </section>
@@ -1361,6 +1372,12 @@ export default function App() {
             className="results-section scroll-target"
             aria-label="Policy analysis and editable appeal draft"
           >
+            {replayCaseKey && (
+              <div className="callout callout-blue">
+                <strong>Recorded run, not live:</strong> these results come from a run recorded on{" "}
+                {RECORDED_REPLAY_RUNS[replayCaseKey].recordedAt}. Exit Replay to run Cleave yourself.
+              </div>
+            )}
             {cloudMeta &&
               liveGate?.ok &&
               cloudMeta.allowlistSnapshot !== `${liveGate.serialized}|${eocSourceMode}|${customEocText.length}` && (
@@ -1369,13 +1386,15 @@ export default function App() {
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
               >
                 <span>
-                  <strong>What gets sent has changed since this result.</strong> Re-run to update the plan match and
-                  draft for your current selection.
+                  <strong>What gets sent has changed since this result.</strong>{" "}
+                  {inReplay
+                    ? "Exit Replay to re-run live with your current selection."
+                    : "Re-run to update the plan match and draft for your current selection."}
                 </span>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleMatchClauseInCloud}
-                  disabled={analyzingCloud || runningOffline || customEocBlocked}
+                  disabled={analyzingCloud || runningOffline || customEocBlocked || inReplay}
                 >
                   {analyzingCloud && cloudRetryNote
                     ? cloudRetryNote
@@ -1405,7 +1424,8 @@ export default function App() {
                     title={`Verified wire audit (${cloudMeta.source})`}
                     style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--ink-muted)" }}
                   >
-                    Checked what was sent: <strong>{cloudMeta.leakedCanaries}</strong> of your personal details in{" "}
+                    {inReplay ? "Checked what was sent in the recorded run" : "Checked what was sent"}:{" "}
+                    <strong>{cloudMeta.leakedCanaries}</strong> of your personal details in{" "}
                     <strong>{cloudMeta.wireBytes.toLocaleString()} bytes</strong>.
                   </div>
                 )}
