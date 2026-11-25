@@ -1,12 +1,33 @@
-import type { WireEntry } from "./types";
+import type { WireChannel, WireEntry } from "./types";
 
 const entries: WireEntry[] = [];
 const listeners = new Set<() => void>();
 let installed = false;
 let seq = 0;
 
+// Scoped tagging for concurrent/sequential wire inspection
+let currentChannel: WireChannel = "cleave_production";
+let currentCaseLabel: string | undefined;
+
 function notify() {
   for (const fn of listeners) fn();
+}
+
+export async function withWireContext<T>(
+  channel: WireChannel,
+  caseLabel: string | undefined,
+  fn: () => Promise<T>
+): Promise<T> {
+  const prevChannel = currentChannel;
+  const prevLabel = currentCaseLabel;
+  currentChannel = channel;
+  currentCaseLabel = caseLabel;
+  try {
+    return await fn();
+  } finally {
+    currentChannel = prevChannel;
+    currentCaseLabel = prevLabel;
+  }
 }
 
 export function installWireSpy(): void {
@@ -22,8 +43,8 @@ export function installWireSpy(): void {
           ? input.toString()
           : input.url;
 
-    // Observe only actual external/HTTP(S) network traffic (ignore local data:, blob:, and Vite local dev paths)
-    const isRemoteHttp = /^https?:\/\//i.test(url) && !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(url);
+    const isRemoteHttp =
+      /^https?:\/\//i.test(url) && !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(url);
 
     let bodyText = "";
     if (init?.body) {
@@ -46,13 +67,25 @@ export function installWireSpy(): void {
         url,
         method: init?.method || "GET",
         bodyLength: bodyText.length,
-        bodyText
+        bodyText,
+        channel: currentChannel,
+        caseLabel: currentCaseLabel
       });
       notify();
     }
 
     return nativeFetch(input, init);
   };
+}
+
+export function annotateWireEntries(entryIds: string[], leakedValues: string[]): void {
+  const idSet = new Set(entryIds);
+  for (const e of entries) {
+    if (idSet.has(e.id)) {
+      e.leakedValues = leakedValues;
+    }
+  }
+  notify();
 }
 
 export function getWireCount(): number {

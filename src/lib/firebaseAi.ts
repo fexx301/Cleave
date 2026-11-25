@@ -15,6 +15,11 @@ import {
   checkChunkBounds,
   computeDeterministicDayOffsets,
   detectAfterHoursCue,
+  detectDenialReasonCue,
+  detectNetworkStatusCue,
+  detectOngoingTreatmentCue,
+  detectPlanIdCue,
+  detectServiceSettingCue,
   extractDeterministicVault,
   mergeVaults,
   scanOutboundBodyForCanaries
@@ -30,7 +35,7 @@ import type {
   SyntheticCase,
   WireEntry
 } from "./types";
-import { getWireCount, getWireSlice } from "./wireSpy";
+import { annotateWireEntries, getWireCount, getWireSlice, withWireContext } from "./wireSpy";
 
 const CONFIG_STORAGE_KEY = "cleave_firebase_config_v1";
 const APPCHECK_DEBUG_STORAGE_KEY = "cleave_appcheck_debug_token_v1";
@@ -43,6 +48,8 @@ export const DEFAULT_CLOUD_MODEL =
 let activeApp: FirebaseApp | null = null;
 let activeAi: AI | null = null;
 let activeAppCheckMode: "off" | "debug_token" | "recaptcha_v3" = "off";
+let activeConfigFingerprint: string | null = null;
+let initInFlight: Promise<{ projectId: string; appCheckMode: "off" | "debug_token" | "recaptcha_v3" }> | null = null;
 
 export interface RuntimeSettings {
   config: FirebaseWebConfig | null;
@@ -146,11 +153,21 @@ const CLOUD_ANALYSIS_SCHEMA = Schema.object({
     cited_clause_quote: Schema.string(),
     exception_applies: Schema.enumString({ enum: ["YES", "CONDITIONAL", "NO", "UNKNOWN_NO_POLICY"] }),
     needs_patient_confirmation: Schema.boolean(),
-    confirmation_questions: Schema.array({ items: Schema.string() }),
+    confirmation_items: Schema.array({
+      description:
+        "If needs_patient_confirmation is true, list each unresolved fact as a pair: question (shown to the patient) and draft_statement (a clean first-person factual sentence inserted ONLY if the patient checks the box; never a question).",
+      items: Schema.object({
+        properties: {
+          question: Schema.string(),
+          draft_statement: Schema.string()
+        },
+        required: ["question", "draft_statement"]
+      })
+    }),
     plain_explanation: Schema.string(),
     draft_request_for_review: Schema.string({
       description:
-        "Editable Request for Review using ONLY opaque placeholders [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME]. Never invent real personal identifiers."
+        "Editable Request for Review using ONLY opaque placeholders [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME]. CRITICAL: When needs_patient_confirmation is true, NEVER state any unconfirmed fact as already true in this draft — phrase the request conditionally pending confirmation."
     })
   },
   required: [
@@ -159,7 +176,7 @@ const CLOUD_ANALYSIS_SCHEMA = Schema.object({
     "cited_clause_quote",
     "exception_applies",
     "needs_patient_confirmation",
-    "confirmation_questions",
+    "confirmation_items",
     "plain_explanation",
     "draft_request_for_review"
   ]
@@ -243,56 +260,89 @@ export async function initializeCleaveFirebase(settings: RuntimeSettings): Promi
     throw new Error("Paste your Firebase Web config in Settings first.");
   }
 
-  for (const app of getApps()) {
-    await deleteApp(app);
+  const fingerprint = JSON.stringify({
+    apiKey: settings.config.apiKey,
+    projectId: settings.config.projectId,
+    appId: settings.config.appId,
+    debug: settings.appCheckDebugToken.trim(),
+    recaptcha: settings.recaptchaSiteKey.trim()
+  });
+
+  // Deduplicate React StrictMode double-mount init to avoid Firebase app/app-deleted warnings
+  if (activeAi && activeConfigFingerprint === fingerprint) {
+    localStorage.setItem(CLOUD_MODEL_STORAGE_KEY, settings.cloudModel.trim() || DEFAULT_CLOUD_MODEL);
+    return { projectId: settings.config.projectId, appCheckMode: activeAppCheckMode };
+  }
+  if (initInFlight) {
+    return initInFlight;
   }
 
-  const g = self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean };
-  const debugToken = settings.appCheckDebugToken.trim();
-  const recaptchaKey = settings.recaptchaSiteKey.trim();
+  initInFlight = (async () => {
+    for (const app of getApps()) {
+      try {
+        await deleteApp(app);
+      } catch {
+        // Already deleted
+      }
+    }
 
-  if (debugToken) {
-    g.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
-  } else {
-    delete g.FIREBASE_APPCHECK_DEBUG_TOKEN;
+    const g = self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean };
+    const debugToken = settings.appCheckDebugToken.trim();
+    const recaptchaKey = settings.recaptchaSiteKey.trim();
+
+    if (debugToken) {
+      g.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+    } else {
+      delete g.FIREBASE_APPCHECK_DEBUG_TOKEN;
+    }
+
+    activeApp = initializeApp(settings.config!);
+
+    if (debugToken) {
+      initializeAppCheck(activeApp, {
+        provider: new ReCaptchaV3Provider(recaptchaKey || "debug-placeholder-site-key"),
+        isTokenAutoRefreshEnabled: true
+      });
+      activeAppCheckMode = "debug_token";
+    } else if (recaptchaKey) {
+      initializeAppCheck(activeApp, {
+        provider: new ReCaptchaV3Provider(recaptchaKey),
+        isTokenAutoRefreshEnabled: true
+      });
+      activeAppCheckMode = "recaptcha_v3";
+    } else {
+      activeAppCheckMode = "off";
+    }
+
+    activeAi = getAI(activeApp, { backend: new GoogleAIBackend() });
+    activeConfigFingerprint = fingerprint;
+
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(settings.config, null, 2));
+    if (debugToken) localStorage.setItem(APPCHECK_DEBUG_STORAGE_KEY, debugToken);
+    else localStorage.removeItem(APPCHECK_DEBUG_STORAGE_KEY);
+    if (recaptchaKey) localStorage.setItem(RECAPTCHA_STORAGE_KEY, recaptchaKey);
+    else localStorage.removeItem(RECAPTCHA_STORAGE_KEY);
+    localStorage.setItem(CLOUD_MODEL_STORAGE_KEY, settings.cloudModel.trim() || DEFAULT_CLOUD_MODEL);
+
+    return { projectId: settings.config!.projectId, appCheckMode: activeAppCheckMode };
+  })();
+
+  try {
+    return await initInFlight;
+  } finally {
+    initInFlight = null;
   }
-
-  activeApp = initializeApp(settings.config);
-
-  if (debugToken) {
-    initializeAppCheck(activeApp, {
-      provider: new ReCaptchaV3Provider(recaptchaKey || "debug-placeholder-site-key"),
-      isTokenAutoRefreshEnabled: true
-    });
-    activeAppCheckMode = "debug_token";
-  } else if (recaptchaKey) {
-    initializeAppCheck(activeApp, {
-      provider: new ReCaptchaV3Provider(recaptchaKey),
-      isTokenAutoRefreshEnabled: true
-    });
-    activeAppCheckMode = "recaptcha_v3";
-  } else {
-    activeAppCheckMode = "off";
-  }
-
-  activeAi = getAI(activeApp, { backend: new GoogleAIBackend() });
-
-  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(settings.config, null, 2));
-  if (debugToken) localStorage.setItem(APPCHECK_DEBUG_STORAGE_KEY, debugToken);
-  else localStorage.removeItem(APPCHECK_DEBUG_STORAGE_KEY);
-  if (recaptchaKey) localStorage.setItem(RECAPTCHA_STORAGE_KEY, recaptchaKey);
-  else localStorage.removeItem(RECAPTCHA_STORAGE_KEY);
-  localStorage.setItem(CLOUD_MODEL_STORAGE_KEY, settings.cloudModel.trim() || DEFAULT_CLOUD_MODEL);
-
-  return { projectId: settings.config.projectId, appCheckMode: activeAppCheckMode };
 }
 
 export function clearSavedFirebaseSettings(): void {
   localStorage.removeItem(CONFIG_STORAGE_KEY);
+  localStorage.removeItem("cleave_probe_firebase_config_v1");
   localStorage.removeItem(APPCHECK_DEBUG_STORAGE_KEY);
+  localStorage.removeItem("cleave_probe_appcheck_debug_token_v1");
   localStorage.removeItem(RECAPTCHA_STORAGE_KEY);
   activeAi = null;
   activeApp = null;
+  activeConfigFingerprint = null;
   activeAppCheckMode = "off";
 }
 
@@ -456,13 +506,36 @@ ${rawLetter}`;
     const mergedVault = mergeVaults(parsed.identity_vault, detVault);
     const dayOffsets = computeDeterministicDayOffsets(rawLetter, referenceDateIso);
     const detAfterHours = detectAfterHoursCue(rawLetter);
+    const detDenialReason = detectDenialReasonCue(rawLetter);
+    const detServiceSetting = detectServiceSettingCue(rawLetter);
+    const detOngoing = detectOngoingTreatmentCue(rawLetter);
+    const detNetwork = detectNetworkStatusCue(rawLetter);
+    const detPlanId = detectPlanIdCue(rawLetter);
 
+    const nanoProp = parsed.allowlist_proposal || {};
     const proposedAllowlist: AllowlistProposal = {
-      ...(parsed.allowlist_proposal || {}),
+      ...nanoProp,
+      plan_id: nanoProp.plan_id && /^PLAN-[A-Z0-9-]{4,28}$/.test(nanoProp.plan_id) ? nanoProp.plan_id : detPlanId || nanoProp.plan_id,
+      denial_reason_code:
+        !nanoProp.denial_reason_code || nanoProp.denial_reason_code === "OTHER"
+          ? detDenialReason || nanoProp.denial_reason_code || "OTHER"
+          : nanoProp.denial_reason_code,
+      service_setting:
+        !nanoProp.service_setting || nanoProp.service_setting === "UNKNOWN"
+          ? detServiceSetting || nanoProp.service_setting || "UNKNOWN"
+          : nanoProp.service_setting,
+      network_status:
+        !nanoProp.network_status || nanoProp.network_status === "UNKNOWN"
+          ? detNetwork || nanoProp.network_status || "UNKNOWN"
+          : nanoProp.network_status,
       after_hours_visit_confirmed:
-        parsed.allowlist_proposal?.after_hours_visit_confirmed === "YES" || detAfterHours === "YES"
+        nanoProp.after_hours_visit_confirmed === "YES" || detAfterHours === "YES"
           ? "YES"
-          : parsed.allowlist_proposal?.after_hours_visit_confirmed || "NOT_MENTIONED",
+          : nanoProp.after_hours_visit_confirmed || "NOT_MENTIONED",
+      ongoing_treatment:
+        nanoProp.ongoing_treatment === "YES" || detOngoing === "YES"
+          ? "YES"
+          : nanoProp.ongoing_treatment || "NOT_MENTIONED",
       days_since_service: dayOffsets.daysSinceService,
       days_since_denial: dayOffsets.daysSinceDenial
     };
@@ -504,9 +577,10 @@ export async function analyzeAllowlistInCloud(params: {
   cloudModel: string;
   canariesToAudit?: readonly string[];
   customEoc?: PlanEoc | null;
+  caseLabel?: string;
 }): Promise<CloudAnalysisOutcome> {
   const ai = requireAi();
-  const { allowlistPayload, cloudModel, canariesToAudit = [], customEoc } = params;
+  const { allowlistPayload, cloudModel, canariesToAudit = [], customEoc, caseLabel } = params;
   const modelName = cloudModel.trim() || DEFAULT_CLOUD_MODEL;
 
   const model = getGenerativeModel(ai, {
@@ -530,11 +604,12 @@ export async function analyzeAllowlistInCloud(params: {
 Rules:
 1. Check whether an EOC exception clause applies AND check the internal appeal filing deadline (Section 8.2 / 9.1: 180 calendar days using days_since_denial).
 2. Cite the exact clause ID(s) and quote the controlling sentence verbatim.
-3. For Section 4.2(a): if service_setting is EMERGENCY_OR_AFTER_HOURS_URGENT AND after_hours_visit_confirmed is YES (and days_since_denial <= 180), set exception_applies="YES" and needs_patient_confirmation=false (chart urgency documentation is only required for Section 5.1(c) imaging, NOT Section 4.2(a) after-hours care).
-4. For Section 4.3(b) or 4.4(a): if network_status is IN_NETWORK and service_setting matches (and days_since_denial <= 180), set exception_applies="YES" and needs_patient_confirmation=false.
-5. If an exception depends on an unconfirmed fact (such as Section 5.1(c) chart urgency documentation or Section 6.4(a) plan enrollment within 90 days), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and list the exact patient confirmation question(s). Never invent unconfirmed facts.
-6. If no exception applies or days_since_denial > 180, set exception_applies="NO", needs_patient_confirmation=false, and cite the controlling rules (e.g. "4.1 / 8.2").
-7. Write draft_request_for_review using ONLY opaque placeholders: [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME].
+3. For Section 4.2(a): if service_setting is EMERGENCY_OR_AFTER_HOURS_URGENT AND after_hours_visit_confirmed is YES (and days_since_denial <= 180), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[]. (Chart urgency documentation is ONLY required for Section 5.1(c) imaging, NOT Section 4.2(a) after-hours urgent care.)
+4. For Section 4.3(b) or 4.4(a): if network_status is IN_NETWORK and service_setting matches (and days_since_denial <= 180), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[].
+5. If an exception depends on an unconfirmed fact (such as Section 5.1(c) chart urgency documentation when urgency_documented is NOT YES, OR Section 6.4(a) continuity-of-care when ongoing_treatment is YES and enrollment_date_known is NOT YES), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and populate confirmation_items with pairs of { question, draft_statement }.
+6. STRICT NO-FABRICATION RULE: When needs_patient_confirmation is true, draft_request_for_review MUST NOT assert any unconfirmed fact as already true! For example, do NOT write "my ordering physician documented clinical urgency" or "I enrolled within 90 days" inside draft_request_for_review — instead write a conditional opening ("I am requesting review under Section 5.1(c) and will confirm/attach the supporting documentation listed below once verified.") so the patient's ticked confirmation_items supply the factual statement.
+7. If no exception applies or days_since_denial > 180, set exception_applies="NO", needs_patient_confirmation=false, confirmation_items=[], and cite the controlling rules (e.g. "4.1 / 8.2").
+8. Write draft_request_for_review using ONLY opaque placeholders: [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME].
 
 ALLOWLIST CLAIM FACTS (JSON):
 ${JSON.stringify(allowlistPayload, null, 2)}
@@ -543,19 +618,26 @@ GENERIC PLAN EOC (${policy.plan_id} — ${policy.plan_name}):
 ${JSON.stringify(policy.clauses, null, 2)}`
     : `You are a health insurance appeal helper. The patient removed their Plan Policy Identifier, so NO specific Plan Evidence of Coverage is available.
 Set mode_used="GENERAL_GUIDANCE_ONLY", cited_clause_id="NONE", cited_clause_quote="", exception_applies="UNKNOWN_NO_POLICY", needs_patient_confirmation=true.
-Explain plainly what general appeal guidance applies from the remaining allowlisted fields, and explain clearly that matching a specific referral or prior-authorization waiver requires the plan identifier and Evidence of Coverage.
-Use ONLY opaque placeholders ([MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME]) in draft_request_for_review.
+In confirmation_items, list 2-3 practical next steps as { question: "concise next-step prompt", draft_statement: "concise factual sentence the member can include if applicable" }.
+Explain plainly what general appeal guidance applies from the remaining allowlisted fields, and explain that matching a specific referral or prior-authorization waiver requires the plan identifier and Evidence of Coverage.
+Use ONLY opaque placeholders ([MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME]) in draft_request_for_review, and do NOT invent unconfirmed facts.
 
 ALLOWLIST CLAIM FACTS (JSON):
 ${JSON.stringify(allowlistPayload, null, 2)}`;
 
   const wireBefore = getWireCount();
   const t0 = performance.now();
-  const result = await callWithTransientRetry(() => model.generateContent(prompt));
+  const result = await withWireContext("cleave_production", caseLabel, () =>
+    callWithTransientRetry(() => model.generateContent(prompt))
+  );
   const latencyMs = Math.round(performance.now() - t0);
   const wireEntries = getWireSlice(wireBefore);
   const allWireBodies = wireEntries.map((e) => e.bodyText).join("\n");
   const leakedCanaries = scanOutboundBodyForCanaries(allWireBodies, canariesToAudit);
+  annotateWireEntries(
+    wireEntries.map((e) => e.id),
+    leakedCanaries
+  );
 
   const analysis = JSON.parse(result.response.text()) as CloudAnalysis;
   return {
@@ -578,6 +660,7 @@ export async function runOfflineResilientTriage(params: {
   allowlistPayload: Partial<Record<AllowlistKey, string | number>>;
   cloudModel: string;
   forceSimulateOffline?: boolean;
+  caseLabel?: string;
 }): Promise<{
   inferenceSource: string;
   latencyMs: number;
@@ -586,7 +669,7 @@ export async function runOfflineResilientTriage(params: {
   summaryText: string;
 }> {
   const ai = requireAi();
-  const { allowlistPayload, cloudModel, forceSimulateOffline } = params;
+  const { allowlistPayload, cloudModel, forceSimulateOffline, caseLabel } = params;
   const modelName = cloudModel.trim() || DEFAULT_CLOUD_MODEL;
 
   const wireBefore = getWireCount();
@@ -604,20 +687,29 @@ export async function runOfflineResilientTriage(params: {
     }
   });
 
-  const prompt = `In 3 short bullet points, give a quick offline appeal readiness checklist from ONLY these non-identifying claim fields (do not invent policy clause numbers):
+  const prompt = `Write 3 short plain-text checklist lines (NO markdown bold **, NO asterisks, NO invented clause numbers) to prepare an appeal using ONLY these structured claim fields:
 ${JSON.stringify(allowlistPayload)}`;
 
-  const result = await model.generateContent(prompt);
+  const result = await withWireContext("cleave_production", caseLabel, () => model.generateContent(prompt));
   const latencyMs = Math.round(performance.now() - t0);
   const httpRequests = getWireSlice(wireBefore).length;
-  const source = result.response.inferenceSource || (httpRequests === 0 ? InferenceSource.ON_DEVICE : InferenceSource.IN_CLOUD);
+  const source =
+    result.response.inferenceSource || (httpRequests === 0 ? InferenceSource.ON_DEVICE : InferenceSource.IN_CLOUD);
+
+  // Cleanly strip any stray markdown bold/italic markers so the UI renders clean archival prose
+  const cleanText = result.response
+    .text()
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/^\s*[-*•]\s+/gm, "• ")
+    .trim();
 
   return {
     inferenceSource: source,
     latencyMs,
     httpRequests,
     offlineDegraded: source === InferenceSource.ON_DEVICE,
-    summaryText: result.response.text()
+    summaryText: cleanText
   };
 }
 
@@ -638,11 +730,14 @@ export async function runFailClosedPdfComparison(cloudModel: string): Promise<{
     error?: string;
     inferenceSource?: string;
     httpRequests: number;
+    bytesSent: number;
     rawPdfBase64LeakedOnWire: boolean;
+    decodedLeaksFound: string[];
     verdict: string;
   };
 }> {
   const ai = requireAi();
+  const labCanaries = ["Elena Vasquez", "MBR-8841209", "CLM-2026-991042"];
   const syntheticPdf = "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n% Elena Vasquez MBR-8841209 CLM-2026-991042";
   const pdfBase64 = btoa(syntheticPdf);
   const pdfPrompt = [
@@ -655,7 +750,7 @@ export async function runFailClosedPdfComparison(cloudModel: string): Promise<{
   let onlyOnDevice: { threw: boolean; error?: string; httpRequests: number; verdict: string };
   try {
     const strictModel = getGenerativeModel(ai, { mode: InferenceMode.ONLY_ON_DEVICE });
-    await strictModel.generateContent(pdfPrompt);
+    await withWireContext("fail_closed_lab", "Lab: ONLY_ON_DEVICE PDF", () => strictModel.generateContent(pdfPrompt));
     const reqs = getWireSlice(wireBeforeStrict);
     onlyOnDevice = {
       threw: false,
@@ -682,7 +777,9 @@ export async function runFailClosedPdfComparison(cloudModel: string): Promise<{
     error?: string;
     inferenceSource?: string;
     httpRequests: number;
+    bytesSent: number;
     rawPdfBase64LeakedOnWire: boolean;
+    decodedLeaksFound: string[];
     verdict: string;
   };
   try {
@@ -690,28 +787,46 @@ export async function runFailClosedPdfComparison(cloudModel: string): Promise<{
       mode: InferenceMode.PREFER_ON_DEVICE,
       inCloudParams: { model: cloudModel.trim() || DEFAULT_CLOUD_MODEL }
     });
-    const r = await preferModel.generateContent(pdfPrompt);
+    const r = await withWireContext("fail_closed_lab", "Lab: PREFER_ON_DEVICE PDF (Deliberate Leak Test)", () =>
+      preferModel.generateContent(pdfPrompt)
+    );
     const reqs = getWireSlice(wireBeforePrefer);
-    const leaked = reqs.some((e) => e.bodyText.includes(pdfBase64.slice(0, 24)));
+    const wireText = reqs.map((e) => e.bodyText).join("\n");
+    const decodedLeaks = scanOutboundBodyForCanaries(wireText, labCanaries);
+    const leaked = reqs.some((e) => e.bodyText.includes(pdfBase64.slice(0, 24))) || decodedLeaks.length > 0;
+    annotateWireEntries(
+      reqs.map((e) => e.id),
+      decodedLeaks
+    );
     preferOnDevice = {
       threw: false,
       inferenceSource: r.response.inferenceSource,
       httpRequests: reqs.length,
+      bytesSent: reqs.reduce((s, e) => s + e.bodyLength, 0),
       rawPdfBase64LeakedOnWire: leaked,
+      decodedLeaksFound: decodedLeaks,
       verdict: leaked
-        ? "SILENT LEAK CONFIRMED: PREFER_ON_DEVICE bypassed Gemini Nano and uploaded raw PDF Base64 over HTTPS."
+        ? `SILENT LEAK CONFIRMED: PREFER_ON_DEVICE uploaded raw Base64 PDF over HTTPS (decoded identifiers on wire: ${decodedLeaks.join(", ")}).`
         : "Completed via cloud fallback."
     };
   } catch (err) {
     const reqs = getWireSlice(wireBeforePrefer);
-    const leaked = reqs.some((e) => e.bodyText.includes(pdfBase64.slice(0, 24)));
+    const wireText = reqs.map((e) => e.bodyText).join("\n");
+    const decodedLeaks = scanOutboundBodyForCanaries(wireText, labCanaries);
+    const leaked = reqs.some((e) => e.bodyText.includes(pdfBase64.slice(0, 24))) || decodedLeaks.length > 0;
+    annotateWireEntries(
+      reqs.map((e) => e.id),
+      decodedLeaks
+    );
     preferOnDevice = {
       threw: true,
       error: (err as Error)?.message || String(err),
       httpRequests: reqs.length,
+      bytesSent: reqs.reduce((s, e) => s + e.bodyLength, 0),
       rawPdfBase64LeakedOnWire: leaked,
+      decodedLeaksFound: decodedLeaks,
       verdict: leaked
-        ? "SILENT LEAK CONFIRMED: Even before the server error, PREFER_ON_DEVICE transmitted raw PDF Base64 over HTTPS."
+        ? `SILENT LEAK CONFIRMED: Even before the server error, PREFER_ON_DEVICE transmitted raw Base64 PDF over HTTPS (decoded: ${decodedLeaks.join(", ")}).`
         : "Threw without network transmission."
     };
   }
@@ -721,6 +836,7 @@ export async function runFailClosedPdfComparison(cloudModel: string): Promise<{
 
 /**
  * Manual-Redaction Baseline for the reproducible 6-case / 50-canary eval runner.
+ * Tagged cleanly to channel="manual_baseline_eval" so deliberate baseline leaks never pollute Cleave's production Wire Proof.
  */
 export async function runManualBaselineCloud(
   caseObj: SyntheticCase,
@@ -759,11 +875,16 @@ ${caseObj.manual_redacted_letter}
 ${policy ? `PLAN EOC:\n${JSON.stringify(policy.clauses, null, 2)}` : "PLAN EOC: UNAVAILABLE (plan ID was redacted)."}`;
 
   const wireBefore = getWireCount();
-  const result = await callWithTransientRetry(() => model.generateContent(prompt));
-  const allWireBodies = getWireSlice(wireBefore)
-    .map((e) => e.bodyText)
-    .join("\n");
+  const result = await withWireContext("manual_baseline_eval", `Manual Baseline (${caseObj.id})`, () =>
+    callWithTransientRetry(() => model.generateContent(prompt))
+  );
+  const wireReqs = getWireSlice(wireBefore);
+  const allWireBodies = wireReqs.map((e) => e.bodyText).join("\n");
   const leakedCanaries = scanOutboundBodyForCanaries(allWireBodies, caseObj.canaries);
+  annotateWireEntries(
+    wireReqs.map((e) => e.id),
+    leakedCanaries
+  );
 
   return {
     policyMatched: Boolean(policy),

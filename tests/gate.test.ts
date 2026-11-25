@@ -7,8 +7,13 @@ import {
   checkChunkBounds,
   computeDeterministicDayOffsets,
   detectAfterHoursCue,
+  detectDenialReasonCue,
+  detectNetworkStatusCue,
+  detectOngoingTreatmentCue,
+  detectServiceSettingCue,
   extractDenialSentenceLocally,
   extractDeterministicVault,
+  getDisplayVaultEntries,
   mergeVaults,
   rejoinDraftLocally,
   scanOutboundBodyForCanaries
@@ -155,5 +160,34 @@ describe("Cleave deterministic code gate & allowlist boundary", () => {
       expect(quote).not.toMatch(/^Notice Date:/i);
       expect(quote).toMatch(/referral|prior authorization|denied|excluded/i);
     }
+  });
+
+  it("backstops Case 4 denial category, post-op setting, network status, and ongoing treatment deterministically", () => {
+    const case4 = SYNTHETIC_CASES[3];
+    expect(detectDenialReasonCue(case4.raw_letter)).toBe("MISSING_REFERRAL_AND_OON");
+    expect(detectServiceSettingCue(case4.raw_letter)).toBe("POST_OP_SPECIALIST_FOLLOWUP");
+    expect(detectOngoingTreatmentCue(case4.raw_letter)).toBe("YES");
+    expect(detectNetworkStatusCue(case4.raw_letter)).toBe("OUT_OF_NETWORK");
+  });
+
+  it("detects Base64-encoded PDF canary leaks inside JSON inlineData wire payloads", () => {
+    const syntheticPdf = "%PDF-1.4\n% Elena Vasquez MBR-8841209 CLM-2026-991042";
+    const encoded = Buffer.from(syntheticPdf, "utf8").toString("base64");
+    const wireBody = JSON.stringify({
+      contents: [{ parts: [{ inlineData: { mimeType: "application/pdf", data: encoded } }] }]
+    });
+    const found = scanOutboundBodyForCanaries(wireBody, ["Elena Vasquez", "MBR-8841209", "NotInPdf"]);
+    expect(found).toEqual(["Elena Vasquez", "MBR-8841209"]);
+  });
+
+  it("filters _alt keys consistently in getDisplayVaultEntries so UI counts always agree", () => {
+    const merged = mergeVaults(
+      { member_name: "David Okafor", physician: "Dr. Lindqvist" },
+      { member_name: "David Okafor", physician: "Dr. Samuel Lindqvist" }
+    );
+    expect(Object.keys(merged)).toContain("physician_alt");
+    const displayed = getDisplayVaultEntries(merged);
+    expect(displayed.map(([k]) => k)).not.toContain("physician_alt");
+    expect(displayed).toHaveLength(2);
   });
 });

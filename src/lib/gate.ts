@@ -5,10 +5,13 @@ import type {
   AllowlistProposal,
   CaseScore,
   CloudAnalysis,
+  DenialReasonCode,
   GateResult,
   IdentityVault,
+  NetworkStatus,
   RefusalCode,
   RejoinedDraft,
+  ServiceSetting,
   SyntheticCase
 } from "./types";
 
@@ -253,6 +256,61 @@ export function detectAfterHoursCue(rawLetter: string): "YES" | "NOT_MENTIONED" 
 }
 
 /**
+ * Deterministic backstops for structured policy cues (AI proposes, code validates/backstops
+ * explicit textual markers so small on-device models don't silently drop clear denial codes or ongoing treatment).
+ */
+export function detectDenialReasonCue(rawLetter: string): DenialReasonCode | null {
+  const hasOon = /\b(?:out-of-network|non-participating|REF-02)\b/i.test(rawLetter);
+  const hasReferral = /\b(?:missing[^.\n]{0,30}referral|no[^.\n]{0,25}referral|without a(?: prior)?(?: PCP)? referral|REF-01|REF-02)\b/i.test(
+    rawLetter
+  );
+  const hasPriorAuth = /\b(?:no prior authorization|missing prior authorization|PA-04)\b/i.test(rawLetter);
+
+  if (hasReferral && hasOon) return "MISSING_REFERRAL_AND_OON";
+  if (hasPriorAuth) return "MISSING_PRIOR_AUTH";
+  if (hasReferral) return "MISSING_REFERRAL";
+  return null;
+}
+
+export function detectServiceSettingCue(rawLetter: string): ServiceSetting | null {
+  if (/\b(?:post-operative|post-op)\b/i.test(rawLetter)) return "POST_OP_SPECIALIST_FOLLOWUP";
+  if (/\b(?:behavioral health|psychotherapy)\b/i.test(rawLetter)) return "OUTPATIENT_BEHAVIORAL_HEALTH";
+  if (/\b(?:OB-GYN|obstetrics|gynecolog)/i.test(rawLetter)) return "OUTPATIENT_OBGYN";
+  if (/\b(?:diagnostic imaging|\bMRI\b|\bCT\b|\bPET\b)/i.test(rawLetter)) return "ADVANCED_DIAGNOSTIC_IMAGING";
+  if (detectAfterHoursCue(rawLetter) === "YES" && /\b(?:urgent care|emergency)\b/i.test(rawLetter)) {
+    return "EMERGENCY_OR_AFTER_HOURS_URGENT";
+  }
+  if (/\b(?:elective|cosmetic)\b/i.test(rawLetter)) return "ELECTIVE_OUTPATIENT_SPECIALIST";
+  return null;
+}
+
+export function detectOngoingTreatmentCue(rawLetter: string): "YES" | "NOT_MENTIONED" {
+  return /\b(?:active post-operative|post-operative[^.\n]{0,30}follow-up|active course of|ongoing treatment|transition-of-care|continuity[- ]of[- ]care|oncology|obstetric)\b/i.test(
+    rawLetter
+  )
+    ? "YES"
+    : "NOT_MENTIONED";
+}
+
+export function detectNetworkStatusCue(rawLetter: string): NetworkStatus | null {
+  if (/\b(?:out-of-network|non-participating)\b/i.test(rawLetter)) return "OUT_OF_NETWORK";
+  if (/\b(?:in-network|participating provider)\b/i.test(rawLetter)) return "IN_NETWORK";
+  return null;
+}
+
+export function detectPlanIdCue(rawLetter: string): string | null {
+  const m = rawLetter.match(/\b(PLAN-[A-Z0-9-]{4,28})\b/);
+  return m?.[1] || null;
+}
+
+export function getDisplayVaultEntries(vault: IdentityVault | null): Array<[string, string]> {
+  if (!vault) return [];
+  return Object.entries(vault).filter(
+    ([k, v]) => !k.endsWith("_alt") && typeof v === "string" && v.trim().length > 0
+  ) as Array<[string, string]>;
+}
+
+/**
  * Extracts the exact denial explanation sentence strictly on-device so the UI can show
  * Local Denial Sentence side-by-side with Cloud Cited EOC Clause.
  */
@@ -374,9 +432,31 @@ export function buildAndVerifyOutgoingPayload(params: {
   };
 }
 
+/**
+ * Scans an outbound HTTP request body against ground-truth canaries or local vault secrets.
+ * Decodes inline Base64 `"data":"..."` blobs as well as plain UTF-8 text so Base64-encoded leaks
+ * (such as an uploaded PDF in PREFER_ON_DEVICE) cannot evade detection.
+ */
 export function scanOutboundBodyForCanaries(outboundText: string, canaries: readonly string[]): string[] {
-  const haystack = String(outboundText || "").toLowerCase();
-  return canaries.filter((c) => haystack.includes(c.toLowerCase()));
+  const raw = String(outboundText || "");
+  let searchable = raw;
+
+  // Decode any inlineData Base64 payloads embedded in JSON bodies (e.g. `"data":"JVBERi0..."`)
+  const b64Matches = raw.matchAll(/"data"\s*:\s*"([A-Za-z0-9+/=]{16,})"/g);
+  for (const m of b64Matches) {
+    try {
+      const decoded =
+        typeof atob === "function"
+          ? atob(m[1])
+          : Buffer.from(m[1], "base64").toString("utf8");
+      searchable += `\n${decoded}`;
+    } catch {
+      // Ignore invalid base64
+    }
+  }
+
+  const haystack = searchable.toLowerCase();
+  return Array.from(new Set(canaries.filter((c) => c.trim().length >= 3 && haystack.includes(c.toLowerCase()))));
 }
 
 export function rejoinDraftLocally(cloudDraft: string, identityVault: IdentityVault): RejoinedDraft {

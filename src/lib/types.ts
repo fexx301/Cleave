@@ -102,13 +102,18 @@ export interface PlanEoc {
   clauses: PolicyClause[];
 }
 
+export interface ConfirmationItem {
+  question: string;
+  draft_statement: string;
+}
+
 export interface CloudAnalysis {
   mode_used: "POLICY_MATCHED" | "GENERAL_GUIDANCE_ONLY" | "OFFLINE_LOCAL_TRIAGE";
   cited_clause_id: string;
   cited_clause_quote: string;
   exception_applies: "YES" | "CONDITIONAL" | "NO" | "UNKNOWN_NO_POLICY";
   needs_patient_confirmation: boolean;
-  confirmation_questions: string[];
+  confirmation_items: ConfirmationItem[];
   plain_explanation: string;
   draft_request_for_review: string;
 }
@@ -119,6 +124,8 @@ export interface RejoinedDraft {
   orphanPlaceholders: string[];
 }
 
+export type WireChannel = "cleave_production" | "fail_closed_lab" | "manual_baseline_eval";
+
 export interface WireEntry {
   id: string;
   ts: string;
@@ -126,10 +133,14 @@ export interface WireEntry {
   method: string;
   bodyLength: number;
   bodyText: string;
-  stageTag?: string;
+  channel: WireChannel;
+  caseLabel?: string;
+  leakedValues?: string[];
 }
 
 export interface InferenceTrailStep {
+  runId: string;
+  caseLabel: string;
   step: string;
   modeRequested: "only_on_device" | "only_in_cloud" | "prefer_in_cloud" | "prefer_on_device" | "deterministic_code";
   inferenceSource: "on_device" | "in_cloud" | "local_code";
