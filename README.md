@@ -1,3 +1,7 @@
+<p>
+  <img src="public/cleave-logo.svg" alt="Cleave" height="40" />
+</p>
+
 # Cleave
 
 **Understand why this claim was denied and draft a response without uploading the original letter.**

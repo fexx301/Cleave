@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="Cleave">
+  <defs>
+    <linearGradient id="cleave-ink-fav" x1="80" y1="570" x2="551" y2="175" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#246B4D"/>
+      <stop offset=".5" stop-color="#247772"/>
+      <stop offset="1" stop-color="#327DB3"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#F7F6F3"/>
+  <g fill="url(#cleave-ink-fav)" transform="translate(1.2 -0.6) scale(.045)">
+    <path d="M86 425C70 334 93 245 156 180C219 114 306 85 392 86C495 87 578 131 576 211C575 269 531 305 476 305C445 305 416 294 400 275Z"/>
+    <path d="M93 455L330 350C303 391 307 438 336 465C366 493 412 491 451 472C476 460 494 452 518 454C553 457 576 483 576 518C576 592 490 655 372 656C239 657 127 577 93 455Z"/>
+  </g>
+</svg>

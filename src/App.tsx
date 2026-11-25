@@ -3,7 +3,7 @@ import { EvalSuiteModal } from "./components/EvalSuiteModal";
 import { FailClosedLabModal } from "./components/FailClosedLabModal";
 import { HighlightedLetter } from "./components/HighlightedLetter";
 import {
-  CleaveMarkIcon,
+  CleaveLogo,
   CloudSplitIcon,
   DeviceLockIcon,
   DocumentUploadIcon,
@@ -530,8 +530,7 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-inner">
           <div className="brand">
-            <CleaveMarkIcon size={20} />
-            <span className="brand-name">Cleave</span>
+            <CleaveLogo height={28} />
             <span className="brand-divider" />
             <div className="status-strip">
               <span className={`tag ${nanoStatus === "available" ? "tag-green" : "tag-yellow"}`}>
