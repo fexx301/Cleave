@@ -84,6 +84,7 @@ export default function App() {
     wireBytes: number;
     leakedCanaries: number;
     policyMatched: boolean;
+    allowlistSnapshot: string;
   } | null>(null);
   const [offlineTriage, setOfflineTriage] = useState<{
     source: string;
@@ -325,11 +326,12 @@ export default function App() {
         latencyMs: out.latencyMs,
         wireBytes: out.wireBytes,
         leakedCanaries: out.leakedCanaries.length,
-        policyMatched: out.policyMatched
+        policyMatched: out.policyMatched,
+        allowlistSnapshot: liveGate.serialized
       });
       setRejoined(localJoined);
       setConfirmedIndices([]);
-      setEditableDraft(localJoined.text);
+      setEditableDraft(appendConfirmedPatientFacts(localJoined.text, []));
 
       setTrail((prev) => [
         ...prev,
@@ -841,6 +843,24 @@ export default function App() {
         {/* Step 3: Policy Clause Match, Confirmation Checklist & Re-Joined Draft */}
         {cloudAnalysis && rejoined && (
           <section className="results-section" aria-label="Policy analysis and editable appeal draft">
+            {cloudMeta && liveGate?.ok && cloudMeta.allowlistSnapshot !== liveGate.serialized && (
+              <div
+                className="callout callout-yellow"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+              >
+                <span>
+                  <strong>Allowlist changed since this result was generated.</strong> Re-run Cloud analysis to update the
+                  policy match and draft for your current field selection.
+                </span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleMatchClauseInCloud}
+                  disabled={analyzingCloud || runningOffline}
+                >
+                  {planIdEnabled ? "Re-Run Policy Match" : "Re-Run General Guidance"}
+                </button>
+              </div>
+            )}
             <div className="clause-compare-grid">
               <div className="card">
                 <span className="tag tag-green">From Your Local Letter (Never Uploaded)</span>

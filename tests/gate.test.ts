@@ -151,7 +151,21 @@ describe("Cleave deterministic code gate & allowlist boundary", () => {
     const enriched = appendConfirmedPatientFacts(rejoined.text, [
       "Ordering physician documented clinical urgency in chart."
     ]);
-    expect(enriched).toContain("Patient-Confirmed Supporting Facts:");
+    expect(enriched).toContain("Verified Member Confirmation:");
+
+    // Slot replacement avoids awkward contradiction between pending caveat and confirmed fact
+    const slotted = rejoinDraftLocally(
+      "Claim [CLAIM_ID] for [MEMBER_NAME]. [PENDING_PATIENT_CONFIRMATION]",
+      vault
+    );
+    expect(slotted.orphanPlaceholders).toEqual([]);
+    const unchecked = appendConfirmedPatientFacts(slotted.text, []);
+    expect(unchecked).toContain("Pending member confirmation");
+    const checked = appendConfirmedPatientFacts(slotted.text, [
+      "My ordering physician documented clinical urgency in my medical chart."
+    ]);
+    expect(checked).not.toContain("Pending member confirmation");
+    expect(checked).toContain("My ordering physician documented clinical urgency in my medical chart.");
   });
 
   it("extracts a clean local denial sentence for side-by-side clause display across all 6 cases", () => {

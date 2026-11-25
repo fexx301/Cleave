@@ -459,6 +459,8 @@ export function scanOutboundBodyForCanaries(outboundText: string, canaries: read
   return Array.from(new Set(canaries.filter((c) => c.trim().length >= 3 && haystack.includes(c.toLowerCase()))));
 }
 
+export const PENDING_CONFIRMATION_TOKEN = "[PENDING_PATIENT_CONFIRMATION]";
+
 export function rejoinDraftLocally(cloudDraft: string, identityVault: IdentityVault): RejoinedDraft {
   if (!cloudDraft) {
     return { text: "", rejoinedTokens: [], orphanPlaceholders: [] };
@@ -485,16 +487,31 @@ export function rejoinDraftLocally(cloudDraft: string, identityVault: IdentityVa
     }
   }
 
-  const orphanPlaceholders = Array.from(new Set(out.match(/\[[A-Z0-9_]+\]/g) || []));
+  const orphanPlaceholders = Array.from(new Set(out.match(/\[[A-Z0-9_]+\]/g) || [])).filter(
+    (tok) => tok !== PENDING_CONFIRMATION_TOKEN
+  );
   return { text: out, rejoinedTokens, orphanPlaceholders };
 }
 
 export function appendConfirmedPatientFacts(baseDraft: string, confirmedFacts: string[]): string {
-  if (confirmedFacts.length === 0) return baseDraft;
+  const hasSlot = baseDraft.includes(PENDING_CONFIRMATION_TOKEN);
+  if (confirmedFacts.length === 0) {
+    return hasSlot
+      ? baseDraft
+          .split(PENDING_CONFIRMATION_TOKEN)
+          .join("[Pending member confirmation of the unresolved policy fact above before sending.]")
+      : baseDraft;
+  }
+
+  const confirmedText = confirmedFacts.join(" ");
+  if (hasSlot) {
+    return baseDraft.split(PENDING_CONFIRMATION_TOKEN).join(confirmedText);
+  }
+
   const block = [
     "",
-    "Patient-Confirmed Supporting Facts:",
-    ...confirmedFacts.map((fact) => `- Confirmed by member: ${fact}`)
+    "Verified Member Confirmation:",
+    ...confirmedFacts.map((fact) => `- ${fact}`)
   ].join("\n");
   return `${baseDraft.trim()}${block}`;
 }

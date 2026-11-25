@@ -607,7 +607,7 @@ Rules:
 3. For Section 4.2(a): if service_setting is EMERGENCY_OR_AFTER_HOURS_URGENT AND after_hours_visit_confirmed is YES (and days_since_denial <= 180), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[]. (Chart urgency documentation is ONLY required for Section 5.1(c) imaging, NOT Section 4.2(a) after-hours urgent care.)
 4. For Section 4.3(b) or 4.4(a): if network_status is IN_NETWORK and service_setting matches (and days_since_denial <= 180), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[].
 5. If an exception depends on an unconfirmed fact (such as Section 5.1(c) chart urgency documentation when urgency_documented is NOT YES, OR Section 6.4(a) continuity-of-care when ongoing_treatment is YES and enrollment_date_known is NOT YES), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and populate confirmation_items with pairs of { question, draft_statement }.
-6. STRICT NO-FABRICATION RULE: When needs_patient_confirmation is true, draft_request_for_review MUST NOT assert any unconfirmed fact as already true! For example, do NOT write "my ordering physician documented clinical urgency" or "I enrolled within 90 days" inside draft_request_for_review — instead write a conditional opening ("I am requesting review under Section 5.1(c) and will confirm/attach the supporting documentation listed below once verified.") so the patient's ticked confirmation_items supply the factual statement.
+6. STRICT NO-FABRICATION RULE: When needs_patient_confirmation is true, draft_request_for_review MUST NOT assert any unconfirmed fact as already true! Instead, place the exact token [PENDING_PATIENT_CONFIRMATION] in the sentence where the confirmed supporting fact belongs (e.g., "Please review this claim under Section 5.1(c). [PENDING_PATIENT_CONFIRMATION]") so Cleave can swap that token cleanly with the patient's confirmed draft_statement once they check the box. Do NOT write "I will confirm once verified" separately when using [PENDING_PATIENT_CONFIRMATION].
 7. If no exception applies or days_since_denial > 180, set exception_applies="NO", needs_patient_confirmation=false, confirmation_items=[], and cite the controlling rules (e.g. "4.1 / 8.2").
 8. Write draft_request_for_review using ONLY opaque placeholders: [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME].
 
@@ -687,8 +687,29 @@ export async function runOfflineResilientTriage(params: {
     }
   });
 
-  const prompt = `Write 3 short plain-text checklist lines (NO markdown bold **, NO asterisks, NO invented clause numbers) to prepare an appeal using ONLY these structured claim fields:
-${JSON.stringify(allowlistPayload)}`;
+  const SETTING_HUMAN: Record<string, string> = {
+    EMERGENCY_OR_AFTER_HOURS_URGENT: "emergency or after-hours urgent care",
+    OUTPATIENT_OBGYN: "outpatient OB-GYN visit",
+    OUTPATIENT_BEHAVIORAL_HEALTH: "outpatient behavioral health session",
+    ADVANCED_DIAGNOSTIC_IMAGING: "advanced diagnostic imaging (MRI/CT/PET)",
+    POST_OP_SPECIALIST_FOLLOWUP: "post-operative specialist follow-up",
+    ELECTIVE_OUTPATIENT_SPECIALIST: "elective outpatient specialist visit",
+    UNKNOWN: "unspecified care setting"
+  };
+
+  const humanSummary = [
+    `Denial category: ${String(allowlistPayload.denial_reason_code || "unspecified").toLowerCase().replace(/_/g, " ")}`,
+    `Care setting (NOT a diagnosis): ${SETTING_HUMAN[String(allowlistPayload.service_setting || "UNKNOWN")] || "unspecified"}`,
+    `Network status: ${String(allowlistPayload.network_status || "unknown").toLowerCase().replace(/_/g, " ")}`,
+    allowlistPayload.days_since_denial !== undefined ? `Days since denial notice: ${allowlistPayload.days_since_denial} days` : null,
+    allowlistPayload.days_since_service !== undefined ? `Days since visit: ${allowlistPayload.days_since_service} days` : null,
+    allowlistPayload.plan_id ? `Plan identifier on file: ${allowlistPayload.plan_id}` : "Plan identifier removed by patient"
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const prompt = `Write 3 short plain-text preparation checklist lines (NO markdown bold **, NO asterisks, NO raw ALL_CAPS enum codes, NO invented policy clause numbers, and do NOT call a care setting a diagnosis) using ONLY these non-identifying claim facts:
+${humanSummary}`;
 
   const result = await withWireContext("cleave_production", caseLabel, () => model.generateContent(prompt));
   const latencyMs = Math.round(performance.now() - t0);

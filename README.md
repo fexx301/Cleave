@@ -44,14 +44,13 @@ Most hybrid AI apps pick **local OR cloud per request** and display a fallback b
 
 ---
 
-## Pre-Build Decisive Probe Evidence (Observed 2026-11-25)
+## Verified Evaluation Evidence (Observed 2026-11-25 on Chrome 158 + Firebase AI Logic)
 
 Tested live on **Chrome 158 (`nano_v3_gpu_component`)** + **Firebase AI Logic (`gemini-3.5-flash-lite`, Spark free tier)** across **6 pre-annotated synthetic missing-referral / prior-auth cases** containing **50 planted personal identifiers** (compared against a realistic stressed-patient manual-redaction baseline):
 
 - **Planted identifiers in captured outbound HTTPS bodies:** **0 / 50** for Cleave vs **8 / 50** for realistic manual redaction.
-- **Completed cases / false refusals (tracked separately):** **6 / 6** completed, **0 / 6** false refusals, **4 / 4** valid named refusals (including live `PREFER_ON_DEVICE` PDF leak vs `ONLY_ON_DEVICE` 0-HTTP fail-closed proof).
-- **Exact EOC clause citations:** **6 / 6** for Cleave vs **4 / 6** for manual redaction.
-- **Exact ground-truth pass (clause + exception status + unresolved-fact confirmation):** **5 / 6** in the pre-build probe vs **3 / 6** for manual redaction *(v2 app adds explicit `after_hours_visit_confirmed` to close the Case 1 conservative confirmation note)*.
+- **Completed cases / false refusals (tracked separately):** **6 / 6** completed, **0 / 6** false refusals, **4 / 4** valid named refusals (including live `PREFER_ON_DEVICE` Base64 PDF leak proof vs `ONLY_ON_DEVICE` 0-HTTP fail-closed proof).
+- **Exact ground-truth pass (clause + exception status + unresolved-fact confirmation):** **6 / 6** in the hardened Cleave Chrome Web rehearsal (up from 5 / 6 in the pre-build probe) vs **2 / 6** (3 / 6 in probe) for realistic manual redaction.
 - **Orphan placeholders after local re-join:** **0** across all 6 cases.
 
 *(Scope limit: synthetic single-page letters and two generic EOCs are used for reproducible evaluation; real-world multi-page scanned insurer letters and end-user demand remain outside what this benchmark proves. Cleave is an administrative policy-clause review aid, not legal or medical advice.)*

@@ -285,7 +285,8 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
                       {r.groundTruth.requires_patient_confirmation ? " · confirm" : ""}
                     </td>
                     <td>
-                      <code>{r.cleave.citedClause || "—"}</code> · {r.cleave.exceptionApplies || r.cleave.status} ·{" "}
+                      <code>{r.cleave.citedClause || "—"}</code> · {r.cleave.exceptionApplies || r.cleave.status}
+                      {r.cleave.needsConfirmation ? " · confirm" : ""} ·{" "}
                       <span className={`tag ${r.cleave.leakedCanaries.length === 0 ? "tag-green" : "tag-red"}`}>
                         {r.cleave.leakedCanaries.length} leaks
                       </span>{" "}
@@ -294,7 +295,8 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
                       </span>
                     </td>
                     <td>
-                      <code>{r.manualBaseline?.citedClause || "—"}</code> · {r.manualBaseline?.exceptionApplies || "—"} ·{" "}
+                      <code>{r.manualBaseline?.citedClause || "—"}</code> · {r.manualBaseline?.exceptionApplies || "—"}
+                      {r.manualBaseline?.needsConfirmation ? " · confirm" : ""} ·{" "}
                       <span className={`tag ${(r.manualBaseline?.leakedCanaries.length || 0) === 0 ? "tag-green" : "tag-red"}`}>
                         {r.manualBaseline?.leakedCanaries.length || 0} leaks
                       </span>{" "}
