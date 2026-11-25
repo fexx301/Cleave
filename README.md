@@ -67,16 +67,22 @@ Tested live on **Chrome 158 (`nano_v3_gpu_component`)** + **Firebase AI Logic (`
 
 ---
 
-## Local Development
+## Bring Your Own Plan EOC & Local PDF Support
+
+- **Local PDF parsing (`pdfjs-dist`):** Drop any text-based denial `.pdf` (or download the included sample `/samples/case1-after-hours-denial.pdf`) — extracted strictly in browser memory with **0 bytes uploaded**. Cleave never passes `application/pdf` to `PREFER_ON_DEVICE`.
+- **Bring Your Own Plan EOC:** Beyond the two built-in plans (`PLAN-HMO-2026-GOLD`, `PLAN-EPO-2026-SELECT`), patients can inspect built-in clauses or upload/paste any generic Plan Evidence of Coverage `.pdf`/`.txt` (sample included: `/samples/sample-custom-eoc.pdf` for Summit Regional Health PPO). Deterministic code (`verifyCustomEocSafety`) still scans uploaded EOCs to block accidental personal denial-letter uploads (`REFUSE_RESIDUAL_IDENTIFIER`). Unchecking `Plan Policy Identifier` withholds even a custom EOC and degrades honestly to `GENERAL_GUIDANCE_ONLY`.
+- **Quota & Public Demo Safeguards:** Enforces a soft client-side session limit (40 cloud calls per browser session; unlimited local on-device extraction and Offline Local Triage) and surfaces clear recovery guidance if the free-tier Gemini Developer API returns `429`.
+
+## Local Development & Firebase Hosting
 
 ```bash
 npm install
-npm test        # 11 deterministic gate & allowlist unit tests
+npm test        # 16 unit tests (deterministic gate, allowlist, Base64 leak scan, real pdfjs-dist PDF extraction)
 npm run build   # TypeScript strict check + Vite production bundle
 npm run dev     # http://localhost:5173
 ```
 
-To configure via environment variables instead of the in-app Settings modal, copy `.env.example` to `.env.local` (gitignored) and fill in your Firebase Web config and optional App Check keys.
+To configure via environment variables (or bake public read-only Firebase Web config + App Check reCAPTCHA v3 site key into a Firebase Hosting build), copy `.env.example` to `.env.local` (gitignored) and deploy with `npx firebase-tools deploy --only hosting`. Firebase Hosting config and security headers live in [firebase.json](firebase.json).
 
 ## License
 
