@@ -1,0 +1,14 @@
+FEDERAL MEDICARE ADVANTAGE RULES THAT EVERY MA PLAN MUST FOLLOW (42 CFR Part 422, from eCFR)
+Quoted text is verbatim from eCFR; text outside quotes is paraphrased.
+
+Section 422.113(b)(1)(ii) Emergency services: "covered inpatient and outpatient services that are" furnished by a provider qualified to furnish emergency services and "Needed to evaluate or stabilize an emergency medical condition."
+
+Section 422.113(b)(1)(iii) Urgently needed services: "covered services that are not emergency services as defined in this section," provided when the enrollee is temporarily absent from the plan's service area, or when the plan's network is "temporarily unavailable or inaccessible." The services must be "medically necessary and immediately required" as a result of "an unforeseen illness, injury, or condition," and "It was not reasonable given the circumstances to obtain the services through the organization offering the MA plan."
+
+Section 422.113(b)(2) "The MA organization is financially responsible for emergency and urgently needed services"
+(i) "Regardless of whether the services are obtained within or outside the MA organization;"
+(ii) "Regardless of whether there is prior authorization for the services."
+
+Section 422.582(b) Timeframe for a standard reconsideration (plan appeal): "a request for reconsideration must be filed within 60 calendar days after receipt of the written organization determination notice." Receipt is presumed to be 5 calendar days after the date of the written determination unless there is evidence to the contrary.
+
+Section 422.582(c)(1) "If a party or physician acting on behalf of an enrollee shows good cause, the MA organization may extend the timeframe for filing a request for reconsideration."

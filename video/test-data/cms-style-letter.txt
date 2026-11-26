@@ -1,0 +1,26 @@
+TEST DATA: fictional plan and member, laid out per CMS Form CMS-10003-NDMCP instructions
+
+EXAMPLE HEALTH ADVANTAGE (HMO)
+Notice of Denial of Medical Coverage (or Payment)
+
+Date: November 6, 2026
+Name: Daniel R. Whitcombe
+Member number: M1047-339-82
+Plan: Example Health Advantage (HMO) H9999-001
+Provider: Red Mesa Walk-In Urgent Care, Flagstaff, AZ
+Date of service: October 17, 2026 (Saturday, check-in time 9:42 PM)
+
+Your request was denied
+We have denied payment of the following medical services/items: urgent care visit and X-ray of the left wrist on October 17, 2026 (claim number 2026-1017-55821).
+
+Why did we deny your request?
+We denied your request for payment because the services were received from a provider that is not in the Example Health Advantage (HMO) network, and you did not have a referral from your primary care provider or a prior authorization from the plan. Under your plan's Evidence of Coverage, services from out-of-network providers require a PCP referral and prior authorization. To approve payment, we need a referral from your primary care provider or information showing the services were urgently needed.
+
+You have the right to appeal our decision
+You can ask Example Health Advantage to look at this decision again. [Official CMS form wording for this section is not reproduced in this test letter.]
+
+How to ask for an appeal with Example Health Advantage
+Mail: Example Health Advantage Appeals, PO Box 0000, Dayton, OH 45402. Phone: 555-0100. Fax: 555-0101.
+
+Get help & more information
+Member services: 555-0100 (TTY 711). Your address on file: 1189 Larkspur Ct, Dayton, OH 45402.

@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     watch: {
-      ignored: ["**/ios/**", "**/.firebase/**"]
+      ignored: ["**/ios/**", "**/.firebase/**", "**/video/**"]
     }
   },
   css: {
