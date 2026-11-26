@@ -476,6 +476,13 @@ final class CleaveViewModel: ObservableObject {
         await matchClauseInCloud()
         report.append("CASE1_CLOUD: mode=\(cloudAnalysis?.modeUsed ?? "nil") clause=\(cloudAnalysis?.citedClauseId ?? "nil") exception=\(cloudAnalysis?.exceptionApplies ?? "nil") bytes=\(cloudBytesSent) ms=\(cloudLatencyMs) leaks=\(totalLeaksAcrossSession) orphans=\(rejoinedDraft?.orphanPlaceholders.count ?? -1) rejoined=\(rejoinedDraft?.rejoinedTokens.count ?? 0) err=\(cloudError ?? "none")")
 
+        // 2b. The patient's plan-ID decision: withhold it (expect general guidance), then share it again.
+        try? await Task.sleep(nanoseconds: 2_500_000_000)
+        toggleAllowlistKey(.planId)
+        await matchClauseInCloud()
+        report.append("CASE1_PLANID_WITHHELD: mode=\(cloudAnalysis?.modeUsed ?? "nil") clause=\(cloudAnalysis?.citedClauseId ?? "nil") exception=\(cloudAnalysis?.exceptionApplies ?? "nil") err=\(cloudError ?? "none")")
+        toggleAllowlistKey(.planId)
+
         // 3. Live Case 3 (Unresolved fact + checkbox slot swap)
         try? await Task.sleep(nanoseconds: 2_500_000_000)
         selectCase(CleaveCases.syntheticCases[2])
