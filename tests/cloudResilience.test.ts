@@ -61,3 +61,15 @@ describe("browser cloud-analysis cache", () => {
     expect(getCachedCloudAnalysis("k", 1, null)).toBeNull();
   });
 });
+
+describe("withTimeout", () => {
+  it("rejects a call that never settles, with the given message", async () => {
+    const { withTimeout } = await import("../src/lib/cloudResilience");
+    await expect(withTimeout(new Promise(() => {}), 20, "stalled")).rejects.toThrow("stalled");
+  });
+
+  it("passes a timely result through", async () => {
+    const { withTimeout } = await import("../src/lib/cloudResilience");
+    await expect(withTimeout(Promise.resolve(42), 1000, "stalled")).resolves.toBe(42);
+  });
+});

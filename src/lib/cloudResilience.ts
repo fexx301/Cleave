@@ -69,6 +69,18 @@ export function putCachedCloudAnalysis(
 }
 
 /**
+ * Stops waiting on a call that never settles (an on-device model stall shows as an endless spinner).
+ * The underlying call is not cancelled; its late result is simply ignored.
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
  * Reads the server's own retry hint from a 429 error: Gemini returns google.rpc.RetryInfo
  * ({ retryDelay: "17s" }) in the error details, and the message often says "Please retry in 17.3s".
  */

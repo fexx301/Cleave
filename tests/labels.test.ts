@@ -39,3 +39,14 @@ describe("Plain-English labels & Recorded Replay integrity", () => {
     }
   });
 });
+
+describe("plainCodesInProse", () => {
+  it("turns fact codes into plain words but leaves placeholders alone", async () => {
+    const { plainCodesInProse } = await import("../src/lib/labels");
+    const draft =
+      "This claim was denied under denial code MISSING_REFERRAL_AND_OON for [MEMBER_NAME]. [PENDING_PATIENT_CONFIRMATION] Network: OUT_OF_NETWORK. Ref UNLISTED_CODE.";
+    expect(plainCodesInProse(draft)).toBe(
+      "This claim was denied under denial code missing referral, out-of-network for [MEMBER_NAME]. [PENDING_PATIENT_CONFIRMATION] Network: out of network. Ref UNLISTED_CODE."
+    );
+  });
+});

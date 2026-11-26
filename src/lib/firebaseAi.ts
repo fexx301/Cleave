@@ -21,6 +21,7 @@ import {
   detectPlanIdCue,
   detectServiceSettingCue,
   detectUrgencyDocumentedCue,
+  dropPlanCodeFromVault,
   extractDeterministicVault,
   mergeVaults,
   scanOutboundBodyForCanaries
@@ -29,8 +30,15 @@ import {
   cloudCacheKey,
   getCachedCloudAnalysis,
   parseRetryDelayMs,
-  putCachedCloudAnalysis
+  putCachedCloudAnalysis,
+  withTimeout
 } from "./cloudResilience";
+import { plainCodesInProse } from "./labels";
+
+// Nano normally answers in 10-45 s; past this it has stalled, and an endless spinner helps nobody.
+const ON_DEVICE_TIMEOUT_MS = 90_000;
+const ON_DEVICE_TIMEOUT_MESSAGE =
+  "The on-device model didn't respond within 90 seconds, so Cleave stopped. Nothing was sent. Please try again; the first run after Chrome starts is the slowest.";
 import type {
   AllowlistKey,
   AllowlistProposal,
@@ -555,7 +563,7 @@ LETTER:
 ${rawLetter}`;
 
   try {
-    const result = await localModel.generateContent(prompt);
+    const result = await withTimeout(localModel.generateContent(prompt), ON_DEVICE_TIMEOUT_MS, ON_DEVICE_TIMEOUT_MESSAGE);
     const latencyMs = Math.round(performance.now() - t0);
     const httpRequestsDuringLocal = getWireSlice(wireBefore).length;
 
@@ -565,7 +573,8 @@ ${rawLetter}`;
     };
 
     const detVault = extractDeterministicVault(rawLetter, referenceDateIso);
-    const mergedVault = mergeVaults(parsed.identity_vault, detVault);
+    // A plan code on the letter's "Plan" line identifies the plan, not the member, so it may be sent.
+    const mergedVault = dropPlanCodeFromVault(mergeVaults(parsed.identity_vault, detVault), rawLetter);
     const dayOffsets = computeDeterministicDayOffsets(rawLetter, referenceDateIso);
     const detAfterHours = detectAfterHoursCue(rawLetter);
     const detDenialReason = detectDenialReasonCue(rawLetter);
@@ -685,14 +694,14 @@ export async function analyzeAllowlistInCloud(params: {
   const prompt = policy
     ? `You are a health insurance policy analyst. You receive ONLY structured non-identifying claim facts and a generic Plan Evidence of Coverage (EOC).
 Rules:
-1. Check whether an EOC exception clause applies AND check the internal appeal filing deadline (typically 180 calendar days using days_since_denial, citing the exact appeal deadline section in the EOC below).
+1. Check whether an EOC exception clause applies AND check the appeal filing deadline using days_since_denial against the deadline the EOC below actually states (cite that section; do not assume 180 days if the EOC says otherwise). If days_since_denial is missing, do not claim the appeal is within the deadline; name the deadline and its section instead.
 2. Cite the exact clause ID(s) from the EOC below and quote the controlling sentence verbatim.
-3. For Emergency / After-Hours Urgent Care waivers (e.g. Section 4.2(a) or 7.3(a)): if service_setting is EMERGENCY_OR_AFTER_HOURS_URGENT AND after_hours_visit_confirmed is YES (and within the appeal filing window), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[]. (Chart urgency documentation is ONLY required for retroactive imaging prior auth, NOT after-hours urgent care waivers.)
+3. For Emergency / Urgent Care waivers (e.g. Section 4.2(a) or 7.3(a)): set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[] ONLY when the facts satisfy every condition in the cited clause's own wording (e.g. a clause that waives referral for visits between 8:00 PM and 8:00 AM is satisfied by service_setting EMERGENCY_OR_AFTER_HOURS_URGENT with after_hours_visit_confirmed YES). If the clause also requires a condition the facts do not establish (for example being temporarily outside the plan's service area, the plan network being unavailable or inaccessible, or an unforeseen illness or injury), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and ask about each missing condition in confirmation_items. (Chart urgency documentation is ONLY required for retroactive imaging prior auth, NOT urgent care waivers.)
 4. For In-Network Direct Access waivers (OB-GYN or Behavioral Health): if network_status is IN_NETWORK and service_setting matches (and within the appeal filing window), set exception_applies="YES", needs_patient_confirmation=false, confirmation_items=[].
 5. If an exception depends on an unconfirmed fact (such as chart urgency documentation for retroactive imaging when urgency_documented is NOT YES, OR continuity-of-care when ongoing_treatment is YES and enrollment_date_known is NOT YES), set exception_applies="CONDITIONAL", needs_patient_confirmation=true, and populate confirmation_items with pairs of { question, draft_statement } where draft_statement is strictly in first-person member voice ("I" / "my", e.g., "My ordering physician documented clinical urgency in my medical chart" — never third-person "the patient").
 6. STRICT NO-FABRICATION RULE: When needs_patient_confirmation is true, draft_request_for_review MUST NOT assert any unconfirmed fact as already true! Instead, place the exact token [PENDING_PATIENT_CONFIRMATION] in the sentence where the confirmed supporting fact belongs (e.g., "Please review this claim under Section 5.1(c). [PENDING_PATIENT_CONFIRMATION]") so Cleave can swap that token cleanly with the patient's confirmed draft_statement once they check the box. Do NOT write "I will confirm once verified" separately when using [PENDING_PATIENT_CONFIRMATION].
 7. If no exception applies or days_since_denial exceeds the EOC's appeal deadline, set exception_applies="NO", needs_patient_confirmation=false, confirmation_items=[], and cite the controlling rules (e.g. "4.1 / 8.2").
-8. Write draft_request_for_review using ONLY opaque placeholders: [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME].
+8. Write draft_request_for_review using ONLY opaque placeholders: [MEMBER_NAME], [MEMBER_ID], [CLAIM_ID], [DENIAL_DATE], [SERVICE_DATE], [PROVIDER_NAME], [FACILITY_NAME]. Write plain_explanation and draft_request_for_review in plain English: never copy the fact codes (such as MISSING_REFERRAL_AND_OON or OUT_OF_NETWORK) into them.
 
 ALLOWLIST CLAIM FACTS (JSON):
 ${JSON.stringify(allowlistPayload, null, 2)}
@@ -738,6 +747,9 @@ ${JSON.stringify(allowlistPayload, null, 2)}`;
   );
 
   const analysis = JSON.parse(result.response.text()) as CloudAnalysis;
+  // The patient reads and sends this prose, so fact codes the model copied in become plain words.
+  analysis.plain_explanation = plainCodesInProse(analysis.plain_explanation);
+  analysis.draft_request_for_review = plainCodesInProse(analysis.draft_request_for_review);
   if (cacheKey && leakedCanaries.length === 0) {
     putCachedCloudAnalysis(cacheKey, { analysis, savedAt: Date.now() });
   }
@@ -812,7 +824,9 @@ export async function runOfflineResilientTriage(params: {
   const prompt = `Write 3 short plain-text preparation checklist lines (NO markdown bold **, NO asterisks, NO raw ALL_CAPS enum codes, NO invented policy clause numbers, and do NOT call a care setting a diagnosis) using ONLY these non-identifying claim facts:
 ${humanSummary}`;
 
-  const result = await withWireContext("cleave_production", caseLabel, () => model.generateContent(prompt));
+  const result = await withWireContext("cleave_production", caseLabel, () =>
+    withTimeout(model.generateContent(prompt), ON_DEVICE_TIMEOUT_MS, ON_DEVICE_TIMEOUT_MESSAGE)
+  );
   const latencyMs = Math.round(performance.now() - t0);
   const httpRequests = getWireSlice(wireBefore).length;
   const source =

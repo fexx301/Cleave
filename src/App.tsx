@@ -194,10 +194,11 @@ export default function App() {
     };
   }, [eocSourceMode, customEocCheck, customEocName, proposedAllowlist?.plan_id]);
 
-  // When a custom EOC carries its own PLAN-... code (e.g. Summit PPO), keep the outgoing allowlist plan_id in sync.
+  // Keep the outgoing plan_id in sync with a custom EOC: use the EOC's own plan code (e.g. Summit PPO), and when
+  // the letter has no plan code at all, still send one (CUSTOM-EOC) so the uploaded document is actually used.
   const effectiveAllowlist: AllowlistProposal | null = useMemo(() => {
     if (!proposedAllowlist) return null;
-    if (activeCustomEoc?.plan_id && /^PLAN-[A-Z0-9-]{4,28}$/.test(activeCustomEoc.plan_id)) {
+    if (activeCustomEoc && (detectPlanIdCue(activeCustomEoc.rawPolicyText || "") || !proposedAllowlist.plan_id)) {
       return { ...proposedAllowlist, plan_id: activeCustomEoc.plan_id };
     }
     return proposedAllowlist;
@@ -1603,7 +1604,7 @@ export default function App() {
                     title={`Re-joined on device · ${rejoined.orphanPlaceholders.length} orphan placeholders`}
                   >
                     {rejoined.orphanPlaceholders.length
-                      ? `${rejoined.orphanPlaceholders.length} blanks left to fill`
+                      ? `${rejoined.orphanPlaceholders.length} ${rejoined.orphanPlaceholders.length === 1 ? "blank" : "blanks"} left to fill`
                       : `${rejoined.rejoinedTokens.length} details filled in on this device`}
                   </span>
                   <h3

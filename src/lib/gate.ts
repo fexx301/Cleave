@@ -221,9 +221,10 @@ export function computeDeterministicDayOffsets(
     return { raw, days };
   };
 
-  const notice = parseDateLine(
-    /(?:Notice|N0tice)\s+Date:[ \t]*([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i
-  );
+  const DATE_VALUE = String.raw`([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})`;
+  let notice = parseDateLine(new RegExp(String.raw`(?:Notice|N0tice)\s+Date:[ \t]*` + DATE_VALUE, "i"));
+  // The CMS denial notice (CMS-10003) heads the letter with a bare "Date:" line (not "Date of ...").
+  if (!notice.raw) notice = parseDateLine(new RegExp(String.raw`^[ \t]*Date:[ \t]*` + DATE_VALUE, "im"));
   const service = parseDateLine(
     /(?:Date of Service|Service Date|Svc Date):[ \t]*([A-Za-z]+\s+\d{1,2},\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})/i
   );
@@ -365,9 +366,28 @@ export function detectNetworkStatusCue(rawLetter: string): NetworkStatus | null 
   return null;
 }
 
+/**
+ * Plan codes name a plan shared by every member, not a person: Cleave's PLAN-... codes, or a Medicare
+ * contract-PBP number like H1234-001. A contract number only counts when it sits on a "Plan" line, so a
+ * member ID that happens to look like one is never mistaken for a plan code.
+ */
 export function detectPlanIdCue(rawLetter: string): string | null {
-  const m = rawLetter.match(/\b(PLAN-[A-Z0-9-]{4,28})\b/);
+  const m =
+    rawLetter.match(/\b(PLAN-[A-Z0-9-]{4,28})\b/) ||
+    rawLetter.match(/^[^\n]*\bPlan\b[^\n]{0,80}?\b([HRSE]\d{4}-\d{3})\b/im);
   return m?.[1] || null;
+}
+
+/**
+ * Removes the letter's plan code from the identity vault so it can be sent as the plan identifier.
+ * Only when code (not Nano) found it on a plan line, and never if Nano filed it as a member or claim number.
+ */
+export function dropPlanCodeFromVault(vault: IdentityVault, rawLetter: string): IdentityVault {
+  const planCode = detectPlanIdCue(rawLetter);
+  if (!planCode) return vault;
+  const isCode = (v: unknown) => typeof v === "string" && v.trim().toLowerCase() === planCode.toLowerCase();
+  if (["member_id", "member_id_alt", "claim_id", "claim_id_alt"].some((k) => isCode(vault[k]))) return vault;
+  return Object.fromEntries(Object.entries(vault).filter(([, v]) => !isCode(v))) as IdentityVault;
 }
 
 export function getDisplayVaultEntries(vault: IdentityVault | null): Array<[string, string]> {

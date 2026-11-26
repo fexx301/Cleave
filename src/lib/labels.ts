@@ -58,6 +58,18 @@ export function humanizeValue(value: string): string {
   return VALUE_LABELS[value] ?? (/^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(value) ? sentenceCase(value) : value);
 }
 
+/**
+ * Safety net for cloud prose (explanation and appeal draft): swaps known fact codes like MISSING_REFERRAL_AND_OON
+ * for plain words. Bracketed placeholders ([MEMBER_NAME], [PENDING_PATIENT_CONFIRMATION]) are never touched.
+ */
+export function plainCodesInProse(text: string): string {
+  return text.replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, (code, offset: number, whole: string) => {
+    const label = VALUE_LABELS[code];
+    if (!label || whole[offset - 1] === "[") return code;
+    return label.charAt(0).toLowerCase() + label.slice(1);
+  });
+}
+
 export function humanizeVaultKey(key: string): string {
   return VAULT_KEY_LABELS[key] ?? sentenceCase(key);
 }
