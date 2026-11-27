@@ -13,6 +13,7 @@ import {
   detectServiceSettingCue,
   extractDenialSentenceLocally,
   extractDeterministicVault,
+  extractWithLocalRules,
   getDisplayVaultEntries,
   mergeVaults,
   rejoinDraftLocally,
@@ -203,5 +204,34 @@ describe("Cleave deterministic code gate & allowlist boundary", () => {
     const displayed = getDisplayVaultEntries(merged);
     expect(displayed.map(([k]) => k)).not.toContain("physician_alt");
     expect(displayed).toHaveLength(2);
+  });
+
+  it("extractWithLocalRules runs offline with 0 HTTP, passes the allowlist gate with 0/50 canary leaks, and enforces bounds", () => {
+    const overflow = extractWithLocalRules("X".repeat(12000));
+    expect(overflow.ok).toBe(false);
+    if (!overflow.ok) expect(overflow.refusal).toBe("REFUSE_CHUNK_OVERFLOW");
+
+    let totalLeaks = 0;
+    for (const c of SYNTHETIC_CASES) {
+      const local = extractWithLocalRules(c.raw_letter, BENCHMARK_REFERENCE_DATE);
+      expect(local.ok).toBe(true);
+      if (!local.ok) continue;
+      expect(local.inferenceSource).toBe("local_rules_no_nano");
+      expect(local.httpRequestsDuringLocal).toBe(0);
+      expect(local.proposedAllowlist.plan_id).toBe(c.plan_id);
+      expect(local.proposedAllowlist.days_since_service).toBe(c.ground_truth.expected_days_since_service);
+      expect(local.proposedAllowlist.days_since_denial).toBe(c.ground_truth.expected_days_since_denial);
+
+      const gate = buildAndVerifyOutgoingPayload({
+        proposedAllowlist: local.proposedAllowlist,
+        enabledKeys: ALLOWED_KEYS,
+        identityVault: local.identityVault
+      });
+      expect(gate.ok).toBe(true);
+      if (gate.ok) {
+        totalLeaks += scanOutboundBodyForCanaries(gate.serialized, c.canaries).length;
+      }
+    }
+    expect(totalLeaks).toBe(0);
   });
 });

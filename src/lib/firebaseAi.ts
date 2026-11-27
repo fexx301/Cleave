@@ -301,7 +301,7 @@ export async function initializeCleaveFirebase(settings: RuntimeSettings): Promi
       }
     }
 
-    const g = self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean };
+    const g = globalThis as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean };
     const debugToken = settings.appCheckDebugToken.trim();
     const recaptchaKey = settings.recaptchaSiteKey.trim();
 
@@ -523,6 +523,22 @@ export async function extractOnDevice(
     };
   }
 
+  // Defense-in-depth guard for a real @firebase/ai SDK edge case: in browsers without Chrome's
+  // LanguageModel global, chromeAdapter is undefined and callCloudOrDevice() falls through to
+  // inCloudCall() even when mode is ONLY_ON_DEVICE. Pre-check availability before calling the SDK.
+  const nanoAvail = await checkNanoAvailability();
+  if (nanoAvail !== "available") {
+    return {
+      ok: false,
+      refusal: "REFUSE_LOCAL_UNAVAILABLE",
+      reason: `On-device Gemini Nano is ${nanoAvail} (${
+        nanoAvail === "unsupported_browser" ? "no Chrome LanguageModel API" : "model not downloaded or unavailable"
+      }). Cleave stopped before invoking Firebase AI Logic so the raw letter cannot fall through to the cloud.`,
+      httpRequestsDuringLocal: 0,
+      latencyMs: 0
+    };
+  }
+
   const ai = requireAi();
   const wireBefore = getWireCount();
   const t0 = performance.now();
@@ -566,6 +582,16 @@ ${rawLetter}`;
     const result = await withTimeout(localModel.generateContent(prompt), ON_DEVICE_TIMEOUT_MS, ON_DEVICE_TIMEOUT_MESSAGE);
     const latencyMs = Math.round(performance.now() - t0);
     const httpRequestsDuringLocal = getWireSlice(wireBefore).length;
+
+    if (result.response.inferenceSource && result.response.inferenceSource !== InferenceSource.ON_DEVICE) {
+      return {
+        ok: false,
+        refusal: "REFUSE_LOCAL_UNAVAILABLE",
+        reason: `Expected on_device inference but SDK reported "${result.response.inferenceSource}". Refusing non-local result.`,
+        httpRequestsDuringLocal,
+        latencyMs
+      };
+    }
 
     const parsed = JSON.parse(result.response.text()) as {
       identity_vault?: IdentityVault;
@@ -788,6 +814,15 @@ export async function runOfflineResilientTriage(params: {
   const wireBefore = getWireCount();
   const t0 = performance.now();
 
+  if (forceSimulateOffline) {
+    const nanoAvail = await checkNanoAvailability();
+    if (nanoAvail !== "available") {
+      throw new Error(
+        `Offline Local Triage requires Chrome Gemini Nano on-device (currently ${nanoAvail}). Open in Chrome Desktop 139+ with Gemini Nano ready, or use Match Policy Clause in Cloud.`
+      );
+    }
+  }
+
   const mode = forceSimulateOffline ? InferenceMode.ONLY_ON_DEVICE : InferenceMode.PREFER_IN_CLOUD;
   const model = getGenerativeModel(ai, {
     mode,
@@ -884,26 +919,37 @@ export async function runFailClosedPdfComparison(cloudModel: string): Promise<{
   // 1. ONLY_ON_DEVICE (Cleave's mode) -> MUST fail closed locally with 0 HTTP requests
   const wireBeforeStrict = getWireCount();
   let onlyOnDevice: { threw: boolean; error?: string; httpRequests: number; verdict: string };
-  try {
-    const strictModel = getGenerativeModel(ai, { mode: InferenceMode.ONLY_ON_DEVICE });
-    await withWireContext("fail_closed_lab", "Lab: ONLY_ON_DEVICE PDF", () => strictModel.generateContent(pdfPrompt));
-    const reqs = getWireSlice(wireBeforeStrict);
-    onlyOnDevice = {
-      threw: false,
-      httpRequests: reqs.length,
-      verdict: reqs.length === 0 ? "Stayed on-device (0 HTTP calls)." : "Unexpected network call."
-    };
-  } catch (err) {
-    const reqs = getWireSlice(wireBeforeStrict);
+  const nanoAvailForLab = await checkNanoAvailability();
+  if (nanoAvailForLab !== "available") {
     onlyOnDevice = {
       threw: true,
-      error: (err as Error)?.message || String(err),
-      httpRequests: reqs.length,
+      error: `Pre-call guard blocked ONLY_ON_DEVICE because Chrome LanguageModel is ${nanoAvailForLab} (preventing @firebase/ai missing-adapter cloud fallback).`,
+      httpRequests: 0,
       verdict:
-        reqs.length === 0
-          ? "FAIL-CLOSED PASS: Threw locally with 0 HTTP requests. Zero bytes left the browser."
-          : "Unexpected network request observed."
+        "FAIL-CLOSED PASS: Blocked locally before SDK call with 0 HTTP requests (also prevents @firebase/ai missing-adapter cloud fallback)."
     };
+  } else {
+    try {
+      const strictModel = getGenerativeModel(ai, { mode: InferenceMode.ONLY_ON_DEVICE });
+      await withWireContext("fail_closed_lab", "Lab: ONLY_ON_DEVICE PDF", () => strictModel.generateContent(pdfPrompt));
+      const reqs = getWireSlice(wireBeforeStrict);
+      onlyOnDevice = {
+        threw: false,
+        httpRequests: reqs.length,
+        verdict: reqs.length === 0 ? "Stayed on-device (0 HTTP calls)." : "Unexpected network call."
+      };
+    } catch (err) {
+      const reqs = getWireSlice(wireBeforeStrict);
+      onlyOnDevice = {
+        threw: true,
+        error: (err as Error)?.message || String(err),
+        httpRequests: reqs.length,
+        verdict:
+          reqs.length === 0
+            ? "FAIL-CLOSED PASS: Threw locally with 0 HTTP requests. Zero bytes left the browser."
+            : "Unexpected network request observed."
+      };
+    }
   }
 
   // 2. PREFER_ON_DEVICE (naive wrapper mode) -> silently ships raw PDF Base64 to Google Cloud!

@@ -131,9 +131,11 @@ export function FailClosedLabModal({
               </h3>
               <p className="pane-desc">
                 In <code>@firebase/ai</code>, Chrome&apos;s on-device adapter accepts JPEG/PNG images, not{" "}
-                <code>application/pdf</code>. Passing a denial PDF to <code>PREFER_ON_DEVICE</code> silently uploads the
-                raw PDF Base64 to Google Cloud. Cleave parses PDFs locally with <code>pdfjs-dist</code> and locks
-                extraction to <code>ONLY_ON_DEVICE</code>.
+                <code>application/pdf</code>, so passing a denial PDF to <code>PREFER_ON_DEVICE</code> silently uploads
+                the raw PDF Base64 to Google Cloud. And when Chrome&apos;s <code>LanguageModel</code> API is absent
+                (Safari/Firefox), <code>callCloudOrDevice</code> falls through to the cloud even in{" "}
+                <code>ONLY_ON_DEVICE</code>. Cleave parses PDFs locally with <code>pdfjs-dist</code>, pre-checks{" "}
+                <code>LanguageModel.availability()</code>, and locks extraction to <code>ONLY_ON_DEVICE</code>.
               </p>
             </div>
             {firebaseReady ? (

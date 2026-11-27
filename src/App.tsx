@@ -30,6 +30,7 @@ import {
   buildAndVerifyOutgoingPayload,
   detectPlanIdCue,
   extractDenialSentenceLocally,
+  extractWithLocalRules,
   getDisplayVaultEntries,
   rejoinDraftLocally,
   verifyCustomEocSafety
@@ -498,6 +499,58 @@ export default function App() {
     ]);
   }
 
+  function handleExtractWithLocalRules() {
+    const nextRunId = `rules-${Date.now()}`;
+    setReplayCaseKey(null);
+    setActiveRunId(nextRunId);
+    setLocalError(null);
+    setCloudError(null);
+    setCloudAnalysis(null);
+    setCloudMeta(null);
+    setOfflineTriage(null);
+    setRejoined(null);
+    setConfirmedIndices([]);
+
+    const refDate = activeSampleCase
+      ? BENCHMARK_REFERENCE_DATE
+      : new Date().toISOString().slice(0, 10);
+
+    const res = extractWithLocalRules(rawLetter, refDate);
+    if (!res.ok) {
+      setLocalError({ refusal: res.refusal, message: res.reason });
+      return;
+    }
+
+    const displayEntries = getDisplayVaultEntries(res.identityVault);
+    setIdentityVault(res.identityVault);
+    setProposedAllowlist(res.proposedAllowlist);
+    setEnabledKeys([...ALLOWED_KEYS]);
+    setLocalMeta({
+      source: res.inferenceSource,
+      latencyMs: res.latencyMs,
+      httpRequests: 0
+    });
+    setLetterEditMode(false);
+
+    const nextSecrets = displayEntries.map(([, v]) => v).filter((v) => v.length >= 3);
+    setSessionVaultSecrets((prev) => Array.from(new Set([...prev, ...nextSecrets])));
+
+    setTrail((prev) => [
+      ...prev,
+      {
+        runId: nextRunId,
+        caseLabel: activeCaseLabel,
+        step: "1. Local Rules Split (No Nano — Reduced Accuracy)",
+        modeRequested: "deterministic_code",
+        inferenceSource: "local_code",
+        latencyMs: res.latencyMs,
+        httpRequests: 0,
+        bytesSent: 0,
+        note: `Opt-in local rules fallback: held ${displayEntries.length} identifier(s) on-device (0 HTTP calls). Cloud half still uses Firebase AI Logic.`
+      }
+    ]);
+  }
+
   function toggleAllowlistKey(key: AllowlistKey) {
     setEnabledKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
@@ -844,15 +897,23 @@ export default function App() {
               </details>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="btn btn-primary btn-sm" onClick={() => handleLoadRecordedReplay("case-1")}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleExtractWithLocalRules}
+                disabled={!rawLetter.trim()}
+                title="Extracts locally with deterministic code rules (0 bytes uploaded) so you can still run live Cloud Policy Matching without Gemini Nano"
+              >
+                Run Live with Local Rules
+              </button>
+              <button className="btn btn-sm" onClick={() => handleLoadRecordedReplay("case-1")}>
                 Preview Recorded Run
               </button>
               {nanoStatus === "downloadable" ? (
-                <button className="btn btn-sm" onClick={() => setActiveModal("settings")}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("settings")}>
                   Download Nano
                 </button>
               ) : (
-                <button className="btn btn-sm" onClick={() => setActiveModal("lab")}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setActiveModal("lab")}>
                   Fail-Closed Lab
                 </button>
               )}
@@ -1010,6 +1071,16 @@ export default function App() {
             {localError && (
               <div className="callout callout-red">
                 <strong>{localError.refusal || "Local Extraction Refused"}:</strong> {localError.message}
+                {localError.refusal === "REFUSE_LOCAL_UNAVAILABLE" && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    <button className="btn btn-sm" onClick={handleExtractWithLocalRules} disabled={!rawLetter.trim()}>
+                      Use Local Rules Fallback (No On-Device AI)
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleLoadRecordedReplay("case-1")}>
+                      Preview Recorded Run
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1027,9 +1098,15 @@ export default function App() {
                           marginLeft: 8,
                           fontFamily: "var(--font-mono)",
                           fontSize: 11,
-                          color: "var(--pastel-green-ink)"
+                          color:
+                            localMeta.source === "local_rules_no_nano"
+                              ? "var(--pastel-yellow-ink)"
+                              : "var(--pastel-green-ink)"
                         }}
                       >
+                        {localMeta.source === "local_rules_no_nano"
+                          ? "Local rules only (no Nano) · "
+                          : ""}
                         {localMeta.httpRequests} network requests · {(localMeta.latencyMs / 1000).toFixed(1)}s
                       </span>
                     )}
@@ -1111,6 +1188,14 @@ export default function App() {
               </div>
             ) : (
               <>
+                {localMeta?.source === "local_rules_no_nano" && (
+                  <div className="callout callout-yellow" style={{ padding: "8px 12px", fontSize: 12.5 }}>
+                    <strong>On-device (code rules only — reduced accuracy):</strong> Extracted locally without Gemini
+                    Nano so nothing from your letter was uploaded. Review the fields below carefully (unlabelled custom
+                    letters work best with Chrome Gemini Nano or iOS Apple Foundation Models); cloud policy matching
+                    still runs live on Firebase AI Logic.
+                  </div>
+                )}
                 {planIdEnabled && (activeCustomEoc || matchedPlan) ? (
                   <div className="callout callout-green">
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
@@ -1328,8 +1413,12 @@ export default function App() {
                 <button
                   className="btn"
                   onClick={handleOfflineTriage}
-                  disabled={analyzingCloud || runningOffline || !liveGate?.ok || inReplay}
-                  title="Demonstrates PREFER_IN_CLOUD fallback labeled honestly as OFFLINE_LOCAL_TRIAGE"
+                  disabled={analyzingCloud || runningOffline || !liveGate?.ok || inReplay || nanoStatus !== "available"}
+                  title={
+                    nanoStatus !== "available"
+                      ? "Offline Local Triage requires Chrome Gemini Nano on-device"
+                      : "Demonstrates PREFER_IN_CLOUD fallback labeled honestly as OFFLINE_LOCAL_TRIAGE"
+                  }
                 >
                   {runningOffline && <span className="spinner spinner-dark" />}
                   {runningOffline ? "Running Offline Triage..." : "Offline Local Triage"}

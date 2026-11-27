@@ -266,6 +266,7 @@ export function extractDeterministicVault(
   grab("phone", /\b(\d{3}-\d{3}-\d{4})\b/);
   grab("email", /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i);
   grab("physician", /\b(Dr\.?[ \t]+[A-Z][a-z]+(?:[ \t]+[A-Z][a-z-]+)?)\b/);
+  grab("facility_name", /^Facility:[ \t]*([^\n(]+)/im);
 
   const dates = computeDeterministicDayOffsets(rawLetter, referenceDateIso);
   if (dates.rawNoticeDate) vault.notice_date = dates.rawNoticeDate;
@@ -364,6 +365,74 @@ export function detectNetworkStatusCue(rawLetter: string): NetworkStatus | null 
   if (/\b(?:out-of-network|non-participating)\b/i.test(rawLetter)) return "OUT_OF_NETWORK";
   if (/\b(?:in-network|participating provider)\b/i.test(rawLetter)) return "IN_NETWORK";
   return null;
+}
+
+export function detectEnrollmentDateKnownCue(rawLetter: string): "NO" | "NOT_MENTIONED" {
+  const missing =
+    /\b(?:does not list|doesn't list|missing|not listed|unknown)\b[^.\n]{0,50}\b(?:enrollment|effective)\b|\b(?:enrollment|effective)\s+date\b[^.\n]{0,30}\b(?:not listed|missing|unknown)\b/i;
+  return missing.test(rawLetter) ? "NO" : "NOT_MENTIONED";
+}
+
+/**
+ * Explicit opt-in on-device rules fallback for browsers without Gemini Nano (Safari, Firefox, mobile).
+ * Runs 100% locally with 0 HTTP requests and builds the exact same typed allowlist so raw letter prose
+ * still never leaves the device — at reduced extraction coverage on messy/unlabelled custom letters.
+ */
+export function extractWithLocalRules(
+  rawLetter: string,
+  referenceDateIso: string = BENCHMARK_REFERENCE_DATE
+):
+  | {
+      ok: true;
+      inferenceSource: "local_rules_no_nano";
+      latencyMs: number;
+      httpRequestsDuringLocal: 0;
+      identityVault: IdentityVault;
+      proposedAllowlist: AllowlistProposal;
+    }
+  | {
+      ok: false;
+      refusal: RefusalCode;
+      reason: string;
+      httpRequestsDuringLocal: 0;
+      latencyMs: number;
+    } {
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const bounds = checkChunkBounds(rawLetter);
+  if (!bounds.ok) {
+    return {
+      ok: false,
+      refusal: bounds.refusal,
+      reason: bounds.reason,
+      httpRequestsDuringLocal: 0,
+      latencyMs: 0
+    };
+  }
+
+  const vault = dropPlanCodeFromVault(extractDeterministicVault(rawLetter, referenceDateIso), rawLetter);
+  const dayOffsets = computeDeterministicDayOffsets(rawLetter, referenceDateIso);
+  const proposedAllowlist: AllowlistProposal = {
+    plan_id: detectPlanIdCue(rawLetter) || undefined,
+    denial_reason_code: detectDenialReasonCue(rawLetter) || "OTHER",
+    service_setting: detectServiceSettingCue(rawLetter) || "UNKNOWN",
+    after_hours_visit_confirmed: detectAfterHoursCue(rawLetter),
+    network_status: detectNetworkStatusCue(rawLetter) || "UNKNOWN",
+    days_since_service: dayOffsets.daysSinceService,
+    days_since_denial: dayOffsets.daysSinceDenial,
+    urgency_documented: detectUrgencyDocumentedCue(rawLetter),
+    ongoing_treatment: detectOngoingTreatmentCue(rawLetter),
+    enrollment_date_known: detectEnrollmentDateKnownCue(rawLetter)
+  };
+
+  const elapsed = Math.max(1, Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - t0));
+  return {
+    ok: true,
+    inferenceSource: "local_rules_no_nano",
+    latencyMs: elapsed,
+    httpRequestsDuringLocal: 0,
+    identityVault: vault,
+    proposedAllowlist
+  };
 }
 
 /**
