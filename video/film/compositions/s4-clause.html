@@ -1,0 +1,32 @@
+<template>
+  <style>
+    @font-face { font-family: "Newsreader"; src: url("assets/fonts/newsreader-500.woff2") format("woff2"); font-weight: 500; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f7f6f3; font-family: "Inter", sans-serif; color: #111111; }
+    .frame { position: absolute; inset: 0; }
+    .media { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; }
+    .cap-host { position: absolute; left: 192px; bottom: 120px; }
+    .cap-host.top { bottom: auto; top: 120px; }
+    .cap { display: inline-block; padding: 16px 26px; border-radius: 10px; box-shadow: 0 18px 40px rgba(17,17,17,0.22); font-size: 38px; background: #111111; color: #ffffff; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+    .cap.device { background: #edf3ec; color: #346538; border: 2px solid rgba(52,101,56,0.35); }
+    .cap.cloud { background: #e1f3fe; color: #1f6c9f; border: 2px solid rgba(31,108,159,0.35); }
+    .cap.ask { background: #fbf3db; color: #956400; border: 2px solid rgba(149,100,0,0.35); }
+    .chip { display: inline-block; padding: 10px 18px; border-radius: 8px; background: rgba(17,17,17,0.86); color: #ffffff;
+            font-family: "JetBrains Mono", monospace; font-size: 28px; white-space: nowrap; }
+
+  </style>
+  <div id="root" data-composition-id="s4" data-width="1920" data-height="1080">
+    <div id="s4-frame" class="frame">
+      <video id="s4-vid" class="clip media" src="assets/shots/s4-clause-draft.mp4" data-start="0" data-duration="11.6" muted playsinline></video>
+    </div>
+    <div id="s4-cap1" class="clip cap-host" data-start="0.3" data-duration="5.1"><div id="s4-cap1-in" class="cap ">Her letter's reason, beside her plan's rule</div></div>
+    <div id="s4-cap2" class="clip cap-host" data-start="5.6" data-duration="6.0"><div id="s4-cap2-in" class="cap device">Personal details filled in on this device</div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const wipeIn = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "expo.out" }, at);
+    const wipeOut = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 0% 0 0)" }, { clipPath: "inset(0 0% 0 100%)", duration: 0.3, ease: "power2.in" }, at);
+    wipeIn("#s4-cap1-in", 0.3);
+    wipeIn("#s4-cap2-in", 5.6);
+    window.__timelines["s4"] = tl;
+  </script>
+</template>

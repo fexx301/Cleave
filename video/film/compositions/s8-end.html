@@ -1,0 +1,56 @@
+<template>
+  <style>
+    @font-face { font-family: "Newsreader"; src: url("assets/fonts/newsreader-500.woff2") format("woff2"); font-weight: 500; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f7f6f3; font-family: "Inter", sans-serif; color: #111111; }
+    .frame { position: absolute; inset: 0; }
+    .media { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; }
+    .cap-host { position: absolute; left: 192px; bottom: 120px; }
+    .cap-host.top { bottom: auto; top: 120px; }
+    .cap { display: inline-block; padding: 16px 26px; border-radius: 10px; box-shadow: 0 18px 40px rgba(17,17,17,0.22); font-size: 38px; background: #111111; color: #ffffff; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+    .cap.device { background: #edf3ec; color: #346538; border: 2px solid rgba(52,101,56,0.35); }
+    .cap.cloud { background: #e1f3fe; color: #1f6c9f; border: 2px solid rgba(31,108,159,0.35); }
+    .cap.ask { background: #fbf3db; color: #956400; border: 2px solid rgba(149,100,0,0.35); }
+    .chip { display: inline-block; padding: 10px 18px; border-radius: 8px; background: rgba(17,17,17,0.86); color: #ffffff;
+            font-family: "JetBrains Mono", monospace; font-size: 28px; white-space: nowrap; }
+
+  
+    .cursor { position: absolute; left: 0; top: 0; }
+    .cursor-in { position: absolute; left: 0; top: 0; width: 52px; height: 52px; }
+    .cursor-in svg { width: 52px; height: 52px; filter: drop-shadow(0 4px 6px rgba(17,17,17,0.35)); }
+    .ring { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%; border: 4px solid #1f6c9f; }
+
+    .s8-line { position: absolute; left: 0; width: 1920px; text-align: center; font-family: "Newsreader", serif; font-weight: 500;
+               font-size: 84px; letter-spacing: -0.02em; }
+    #s8-l1 { top: 230px; } #s8-l2 { top: 340px; }
+    #s8-mark { position: absolute; left: 690px; top: 540px; width: 540px; height: 141px; }
+    .s8-logo { position: absolute; left: 0; top: 0; width: 540px; height: auto; display: block; }
+    #s8-left { clip-path: inset(0 86% 0 0); } #s8-right { clip-path: inset(0 71% 0 14%); } #s8-word { clip-path: inset(0 0 0 29%); }
+    .s8-small { position: absolute; left: 0; width: 1920px; text-align: center; }
+    #s8-url { top: 720px; font-family: "JetBrains Mono", monospace; font-size: 36px; }
+    #s8-built { top: 790px; font-size: 30px; color: #787774; }
+  </style>
+  <div id="root" data-composition-id="s8" data-width="1920" data-height="1080">
+    <div id="s8-l1" class="clip s8-line" data-start="0.3" data-duration="7.3"><div id="s8-l1-in">Your details stay home.</div></div>
+    <div id="s8-l2" class="clip s8-line" data-start="1.6" data-duration="6.0"><div id="s8-l2-in">Your appeal goes out.</div></div>
+    <div id="s8-mark" class="clip" data-start="3.0" data-duration="4.6">
+      <img id="s8-left" class="s8-logo" src="assets/cleave-logo.svg" alt="" />
+      <img id="s8-right" class="s8-logo" src="assets/cleave-logo.svg" alt="" />
+      <img id="s8-word" class="s8-logo" src="assets/cleave-logo.svg" alt="Cleave" />
+    </div>
+    <div id="s8-url" class="clip s8-small" data-start="3.9" data-duration="3.7"><div id="s8-url-in">cleave-5a82b.web.app</div></div>
+    <div id="s8-built" class="clip s8-small" data-start="4.2" data-duration="3.4"><div id="s8-built-in">Built with Firebase AI Logic · Web and iOS</div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const wipeIn = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "expo.out" }, at);
+    const wipeOut = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 0% 0 0)" }, { clipPath: "inset(0 0% 0 100%)", duration: 0.3, ease: "power2.in" }, at);
+    wipeIn("#s8-l1-in", 0.3);
+    wipeIn("#s8-l2-in", 1.6);
+    tl.fromTo("#s8-left", { x: -90, opacity: 0 }, { x: 0, opacity: 1, duration: 0.55, ease: "power3.out" }, 3.0);
+    tl.fromTo("#s8-right", { x: 90, opacity: 0 }, { x: 0, opacity: 1, duration: 0.55, ease: "power3.out" }, 3.0);
+    tl.fromTo("#s8-word", { clipPath: "inset(0 100% 0 29%)" }, { clipPath: "inset(0 0% 0 29%)", duration: 0.6, ease: "expo.out" }, 3.5);
+    wipeIn("#s8-url-in", 3.9);
+    wipeIn("#s8-built-in", 4.2);
+    window.__timelines["s8"] = tl;
+  </script>
+</template>

@@ -1,0 +1,4 @@
+Seconds from the first page action (recording started a few s earlier).
+start@0.0 letter-pasted@5.0 click-cleave@9.0 vault-ready@49.1 (on-device 45.6 s, 8 details, 0 requests, privacy check 334 B)
+policy-added@109.3 click-match@114.3 match-result@117.4 (Section 422.113(b)(1)(iii) / 422.582(b); Exception possible — needs your confirmation)
+result-top@131.8 question@136.8 end@141.8 (question: outside the plan's service area or network unavailable?)

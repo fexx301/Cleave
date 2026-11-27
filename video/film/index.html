@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      /* Cleave's own palette (src/styles/cleave.css). */
+      :root {
+        --ground: #f7f6f3;
+        --ink: #111111;
+        --font-display: "Newsreader", Georgia, serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      #ground {
+        position: absolute;
+        inset: 0;
+        background: var(--ground);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="127.2" data-width="1920" data-height="1080">
+      <div id="ground"></div>
+
+      <div id="s1" data-composition-id="s1" data-composition-src="compositions/s1-hook.html" data-start="0" data-duration="14" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s2" data-composition-id="s2" data-composition-src="compositions/s2-split.html" data-start="14.0" data-duration="12" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s3" data-composition-id="s3" data-composition-src="compositions/s3-decision.html" data-start="26.0" data-duration="22.4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s4" data-composition-id="s4" data-composition-src="compositions/s4-clause.html" data-start="48.4" data-duration="11.6" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s5" data-composition-id="s5" data-composition-src="compositions/s5-question.html" data-start="60.0" data-duration="14" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s6" data-composition-id="s6" data-composition-src="compositions/s6-ios.html" data-start="74.0" data-duration="12.9" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s6b" data-composition-id="s6b" data-composition-src="compositions/s6b-pdf-lab.html" data-start="86.9" data-duration="16.7" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s7" data-composition-id="s7" data-composition-src="compositions/s7-proof.html" data-start="103.6" data-duration="16" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s8" data-composition-id="s8" data-composition-src="compositions/s8-end.html" data-start="119.6" data-duration="7.6" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Narration: ElevenLabs "Mark" (eleven_v4), video/vo/take-4, normalised to -16 LUFS. -->
+      <audio id="vo-s1" class="clip" src="assets/vo/s1.wav" data-start="0.6" data-duration="12.88" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s2" class="clip" src="assets/vo/s2.wav" data-start="14.5" data-duration="8.58" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s3" class="clip" src="assets/vo/s3.wav" data-start="26.5" data-duration="17.76" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s4" class="clip" src="assets/vo/s4.wav" data-start="48.8" data-duration="8.64" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s5" class="clip" src="assets/vo/s5.wav" data-start="60.5" data-duration="10.88" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s6" class="clip" src="assets/vo/s6.wav" data-start="74.5" data-duration="9.92" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-pdf" class="clip" src="assets/vo/pdf.wav" data-start="87.3" data-duration="15.92" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s7" class="clip" src="assets/vo/s7.wav" data-start="104.0" data-duration="14.64" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s8" class="clip" src="assets/vo/s8.wav" data-start="120.1" data-duration="4.56" data-track-index="10" data-volume="1"></audio>
+      <!-- Music bed: your LoFi_hold_music.mp3 (60 s), looped twice with 2 s crossfades, about -13 dB under the voice. -->
+      <audio id="music-a" class="clip" src="assets/music/lofi-bed.mp3" data-start="0" data-duration="60" data-track-index="12" data-volume="0.22" data-fade-in="1.5" data-fade-out="2"></audio>
+      <audio id="music-b" class="clip" src="assets/music/lofi-bed.mp3" data-start="58" data-duration="60" data-media-start="0" data-track-index="13" data-volume="0.22" data-fade-in="2" data-fade-out="2"></audio>
+      <audio id="music-c" class="clip" src="assets/music/lofi-bed.mp3" data-start="116" data-duration="11.2" data-media-start="0" data-track-index="12" data-volume="0.22" data-fade-in="2" data-fade-out="3"></audio>
+      <!-- Sound effects: synthesised with ffmpeg (tick, paper, click). -->
+      <audio id="sfx-01" class="clip" src="assets/sfx/tick.wav" data-start="0.45" data-duration="0.09" data-track-index="11" data-volume="0.22"></audio>
+      <audio id="sfx-02" class="clip" src="assets/sfx/tick.wav" data-start="0.65" data-duration="0.09" data-track-index="11" data-volume="0.22"></audio>
+      <audio id="sfx-03" class="clip" src="assets/sfx/tick.wav" data-start="0.85" data-duration="0.09" data-track-index="11" data-volume="0.22"></audio>
+      <audio id="sfx-04" class="clip" src="assets/sfx/tick.wav" data-start="1.05" data-duration="0.09" data-track-index="11" data-volume="0.22"></audio>
+      <audio id="sfx-05" class="clip" src="assets/sfx/tick.wav" data-start="1.25" data-duration="0.09" data-track-index="11" data-volume="0.22"></audio>
+      <audio id="sfx-06" class="clip" src="assets/sfx/tick.wav" data-start="1.45" data-duration="0.09" data-track-index="11" data-volume="0.22"></audio>
+      <audio id="sfx-07" class="clip" src="assets/sfx/click.wav" data-start="14.2" data-duration="0.05" data-track-index="11" data-volume="0.6"></audio>
+      <audio id="sfx-08" class="clip" src="assets/sfx/paper.wav" data-start="23.68" data-duration="0.24" data-track-index="11" data-volume="0.5"></audio>
+      <audio id="sfx-09" class="clip" src="assets/sfx/tick.wav" data-start="27.1" data-duration="0.09" data-track-index="11" data-volume="0.3"></audio>
+      <audio id="sfx-10" class="clip" src="assets/sfx/tick.wav" data-start="27.4" data-duration="0.09" data-track-index="11" data-volume="0.3"></audio>
+      <audio id="sfx-11" class="clip" src="assets/sfx/tick.wav" data-start="27.7" data-duration="0.09" data-track-index="11" data-volume="0.3"></audio>
+      <audio id="sfx-13" class="clip" src="assets/sfx/click.wav" data-start="29.4" data-duration="0.05" data-track-index="11" data-volume="0.55"></audio>
+      <audio id="sfx-14" class="clip" src="assets/sfx/click.wav" data-start="36.0" data-duration="0.05" data-track-index="11" data-volume="0.55"></audio>
+      <audio id="sfx-15" class="clip" src="assets/sfx/tick.wav" data-start="36.5" data-duration="0.09" data-track-index="11" data-volume="0.35"></audio>
+      <audio id="sfx-16" class="clip" src="assets/sfx/click.wav" data-start="39.85" data-duration="0.05" data-track-index="11" data-volume="0.55"></audio>
+      <audio id="sfx-18" class="clip" src="assets/sfx/click.wav" data-start="89.25" data-duration="0.05" data-track-index="11" data-volume="0.55"></audio>
+      <audio id="sfx-19" class="clip" src="assets/sfx/click.wav" data-start="92.75" data-duration="0.05" data-track-index="11" data-volume="0.55"></audio>
+      <audio id="sfx-17" class="clip" src="assets/sfx/paper.wav" data-start="123.15" data-duration="0.24" data-track-index="11" data-volume="0.5"></audio>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

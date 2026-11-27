@@ -1,0 +1,3 @@
+Seconds from the first page action (recording started a few s earlier). Same page session as R9 (CMS-layout letter).
+start@0.0 proof-menu@4.0 wire-proof@6.5 (Cleave Production Traffic Verified, 1 HTTPS request, 0 of 8 identifiers) request-body@11.5
+eval-open@35.7 eval-run@38.7 eval-done@183.7 table@189.7 end@191.7 (Cleave 6/6, 0/50 leaks; manual 4/6, 8/50; 6/6 completed, 0 false refusals)

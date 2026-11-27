@@ -14,3 +14,14 @@ ios/build/
 ios/DerivedData/
 *.xcuserdata
 xcuserdata/
+
+# Demo video: large footage and voice takes stay local
+video/raw/*.mov
+video/vo/
+video/tools/record-window
+video/film/.hyperframes/
+video/film/.transcode-cache/
+# Music bed: licence unconfirmed, kept out of the public repo
+video/film/assets/music/
+video/film/.thumbnails/
+video/film/.waveform-cache/

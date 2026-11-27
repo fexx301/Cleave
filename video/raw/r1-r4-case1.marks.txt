@@ -1,0 +1,5 @@
+Seconds from the first page action (recording started ~1-3 s earlier; align on the scroll at 2.5 s).
+start@0.0 scroll-to-letter@2.5 click-cleave@5.0 vault-ready@41.6 (on-device 36.4 s, 9 details, 0 requests)
+scroll-to-facts@71.2 uncheck-planid@74.2 click-general@78.7 general-result@87.0 (General guidance · no plan section; Can't tell without your plan)
+scroll-back-to-facts@106.0 recheck-planid@108.5 click-match@112.5 match-result@115.8 (Section 4.2(a) / 8.2; Exception applies; 0 of your personal details in 8,413 bytes; live, not cached)
+side-by-side@160.0 draft@165.0 draft-scrolled@169.2 end@171.7 (7 details filled in on this device; no raw codes)

@@ -90,6 +90,8 @@ final class CleaveViewModel: ObservableObject {
     @Published var wireLog: [WireAuditEntry] = []
     @Published var sessionVaultSecrets: [String] = []
     @Published var showWireSheet = false
+    /// Section the recorded demo scrolls to (debug-only demo pacing; nil in normal use).
+    @Published var demoScrollTarget: String? = nil
 
     enum EocSourceMode: String, CaseIterable {
         case builtIn = "Built-in EOC"
@@ -505,6 +507,32 @@ final class CleaveViewModel: ObservableObject {
         try? text.write(to: outURL, atomically: true, encoding: .utf8)
         print("CLEAVE_IOS_SELFTEST_REPORT:\n\(text)")
     }
+
+    /// Paced, scrolling walkthrough for screen-recording the demo video (only when CLEAVE_IOS_DEMO=1).
+    /// Order matches the film: split on device, Plan ID withheld -> general guidance, Plan ID shared -> clause.
+    func runRecordedDemoIfRequested() async {
+        guard ProcessInfo.processInfo.environment["CLEAVE_IOS_DEMO"] == "1" else { return }
+        func pause(_ seconds: Double) async { try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) }
+        func show(_ section: String, hold seconds: Double) async { demoScrollTarget = section; await pause(seconds) }
+
+        await refreshRuntimeStatus()
+        selectCase(CleaveCases.syntheticCases[0])
+        await pause(2)
+        await show("letter", hold: 2)
+        await cleaveOnDevice()
+        await show("letter", hold: 3)
+        await show("allowlist", hold: 3)
+        toggleAllowlistKey(.planId)
+        await pause(2.5)
+        await matchClauseInCloud()
+        await show("results", hold: 5)
+        await show("allowlist", hold: 2)
+        toggleAllowlistKey(.planId)
+        await pause(2.5)
+        await matchClauseInCloud()
+        await show("results", hold: 6)
+        demoScrollTarget = "done"
+    }
 }
 
 struct ContentView: View {
@@ -516,24 +544,30 @@ struct ContentView: View {
             ZStack {
                 CleavePalette.canvas.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        headerSection
-                        heroSection
-                        intakeSection
-                        localLetterCard
-                        seamDivider
-                        allowlistCard
-                        if let offline = vm.offlineTriageText {
-                            offlineTriageCard(text: offline)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            headerSection
+                            heroSection
+                            intakeSection
+                            localLetterCard.id("letter")
+                            seamDivider
+                            allowlistCard.id("allowlist")
+                            if let offline = vm.offlineTriageText {
+                                offlineTriageCard(text: offline)
+                            }
+                            if vm.cloudAnalysis != nil && vm.rejoinedDraft != nil {
+                                resultsSection.id("results")
+                            }
+                            footerNote
                         }
-                        if vm.cloudAnalysis != nil && vm.rejoinedDraft != nil {
-                            resultsSection
-                        }
-                        footerNote
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
+                    .onChange(of: vm.demoScrollTarget) { _, target in
+                        guard let target, target != "done" else { return }
+                        withAnimation(.easeInOut(duration: 0.8)) { proxy.scrollTo(target, anchor: .top) }
+                    }
                 }
             }
             .navigationBarHidden(true)
@@ -552,6 +586,7 @@ struct ContentView: View {
             .task {
                 await vm.refreshRuntimeStatus()
                 await vm.runAutomatedSelfTestIfRequested()
+                await vm.runRecordedDemoIfRequested()
             }
         }
     }

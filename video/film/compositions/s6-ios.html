@@ -1,0 +1,46 @@
+<template>
+  <style>
+    @font-face { font-family: "Newsreader"; src: url("assets/fonts/newsreader-500.woff2") format("woff2"); font-weight: 500; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f7f6f3; font-family: "Inter", sans-serif; color: #111111; }
+    .frame { position: absolute; inset: 0; }
+    .media { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; }
+    .cap-host { position: absolute; left: 192px; bottom: 120px; }
+    .cap-host.top { bottom: auto; top: 120px; }
+    .cap { display: inline-block; padding: 16px 26px; border-radius: 10px; box-shadow: 0 18px 40px rgba(17,17,17,0.22); font-size: 38px; background: #111111; color: #ffffff; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+    .cap.device { background: #edf3ec; color: #346538; border: 2px solid rgba(52,101,56,0.35); }
+    .cap.cloud { background: #e1f3fe; color: #1f6c9f; border: 2px solid rgba(31,108,159,0.35); }
+    .cap.ask { background: #fbf3db; color: #956400; border: 2px solid rgba(149,100,0,0.35); }
+    .chip { display: inline-block; padding: 10px 18px; border-radius: 8px; background: rgba(17,17,17,0.86); color: #ffffff;
+            font-family: "JetBrains Mono", monospace; font-size: 28px; white-space: nowrap; }
+
+    #s6-phone { position: absolute; left: 330px; top: 40px; width: 460px; height: 1000px; border-radius: 56px; overflow: hidden;
+                box-shadow: 0 18px 40px rgba(17,17,17,0.18); background: #ffffff; }
+    #s6-vid { position: absolute; left: 0; top: 0; width: 460px; height: 1000px; object-fit: cover; }
+    #s6-text { position: absolute; left: 960px; top: 300px; width: 768px; }
+    #s6-title { font-family: "Newsreader", serif; font-weight: 500; font-size: 84px; line-height: 1.05; letter-spacing: -0.02em; }
+    #s6-sub { margin-top: 26px; font-size: 34px; line-height: 1.45; color: #2f3437; }
+    .s6-step { position: absolute; left: 960px; top: 640px; }
+  </style>
+  <div id="root" data-composition-id="s6" data-width="1920" data-height="1080">
+    <div id="s6-phone"><video id="s6-vid" class="clip" src="assets/shots/s6-ios.mp4" data-start="0" data-duration="12.9" muted playsinline></video></div>
+    <div id="s6-text" class="clip" data-start="0" data-duration="12.9"><div id="s6-text-in">
+      <div id="s6-title">Same decision on iPhone</div>
+      <div id="s6-sub">Apple's on-device models read the letter.<br />Firebase AI Logic for the cloud step.</div>
+    </div></div>
+    <div id="s6-step1" class="clip s6-step" data-start="0.2" data-duration="1.9"><div id="s6-step1-in" class="cap device">Split on device</div></div>
+    <div id="s6-step2" class="clip s6-step" data-start="2.1" data-duration="3.0"><div id="s6-step2-in" class="cap device">Plan ID held back</div></div>
+    <div id="s6-step3" class="clip s6-step" data-start="5.1" data-duration="3.4"><div id="s6-step3-in" class="cap cloud">General guidance only</div></div>
+    <div id="s6-step4" class="clip s6-step" data-start="8.5" data-duration="2.2"><div id="s6-step4-in" class="cap device">Plan ID shared</div></div>
+    <div id="s6-step5" class="clip s6-step" data-start="10.7" data-duration="2.2"><div id="s6-step5-in" class="cap cloud">Section 4.2(a) · exception applies</div></div>
+    <div id="s6-cap1" class="clip cap-host top" style="left: 960px; top: 210px;" data-start="0.2" data-duration="12.7"><div id="s6-cap1-in" class="chip">iOS Simulator · waits sped up 2.5–4×</div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const wipeIn = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "expo.out" }, at);
+    const wipeOut = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 0% 0 0)" }, { clipPath: "inset(0 0% 0 100%)", duration: 0.3, ease: "power2.in" }, at);
+    tl.fromTo("#s6-text-in", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.6, ease: "expo.out" }, 0.1);
+    wipeIn("#s6-cap1-in", 0.2);
+    ["#s6-step1-in", "#s6-step2-in", "#s6-step3-in", "#s6-step4-in", "#s6-step5-in"].forEach((s, i) => wipeIn(s, [0.2, 2.1, 5.1, 8.5, 10.7][i]));
+    window.__timelines["s6"] = tl;
+  </script>
+</template>

@@ -1,0 +1,64 @@
+<template>
+  <style>
+    @font-face { font-family: "Newsreader"; src: url("assets/fonts/newsreader-500.woff2") format("woff2"); font-weight: 500; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f7f6f3; font-family: "Inter", sans-serif; color: #111111; }
+    .frame { position: absolute; inset: 0; }
+    .media { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; }
+    .cap-host { position: absolute; left: 192px; bottom: 120px; }
+    .cap-host.top { bottom: auto; top: 120px; }
+    .cap { display: inline-block; padding: 16px 26px; border-radius: 10px; box-shadow: 0 18px 40px rgba(17,17,17,0.22); font-size: 38px; background: #111111; color: #ffffff; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+    .cap.device { background: #edf3ec; color: #346538; border: 2px solid rgba(52,101,56,0.35); }
+    .cap.cloud { background: #e1f3fe; color: #1f6c9f; border: 2px solid rgba(31,108,159,0.35); }
+    .cap.ask { background: #fbf3db; color: #956400; border: 2px solid rgba(149,100,0,0.35); }
+    .chip { display: inline-block; padding: 10px 18px; border-radius: 8px; background: rgba(17,17,17,0.86); color: #ffffff;
+            font-family: "JetBrains Mono", monospace; font-size: 28px; white-space: nowrap; }
+
+  
+    .cursor { position: absolute; left: 0; top: 0; }
+    .cursor-in { position: absolute; left: 0; top: 0; width: 52px; height: 52px; }
+    .cursor-in svg { width: 52px; height: 52px; filter: drop-shadow(0 4px 6px rgba(17,17,17,0.35)); }
+    .ring { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%; border: 4px solid #1f6c9f; }
+
+    #s1-frame { transform-origin: 26% 40%; }
+    #s1-q { position: absolute; left: 1010px; top: 300px; width: 718px; }
+    #s1-q-in { background: #ffffff; border-radius: 14px; padding: 44px 48px; box-shadow: 0 24px 60px rgba(17,17,17,0.16); }
+    #s1-q-text { font-family: "Newsreader", serif; font-weight: 500; font-size: 60px; line-height: 1.12; letter-spacing: -0.02em; }
+    #s1-q-who { margin-top: 22px; font-family: "JetBrains Mono", monospace; font-size: 28px; color: #787774; }
+    .hl { position: absolute; height: 32px; border-radius: 5px; background: rgba(52,101,56,0.16); border: 2px solid #346538; }
+  </style>
+  <div id="root" data-composition-id="s1" data-width="1920" data-height="1080">
+    <div id="s1-frame" class="frame">
+      <img id="s1-img" class="clip media" src="assets/shots/s1-letter.png" data-start="0" data-duration="14" alt="Cleave with Elena's sample denial letter" />
+      <div id="s1-hl-name" class="hl" style="left:317px; top:298px; width:153px;"></div>
+      <div id="s1-hl-dob" class="hl" style="left:339px; top:328px; width:121px;"></div>
+      <div id="s1-hl-mid" class="hl" style="left:295px; top:358px; width:131px;"></div>
+      <div id="s1-hl-addr" class="hl" style="left:274px; top:388px; width:240px;"></div>
+      <div id="s1-hl-claim" class="hl" style="left:328px; top:418px; width:175px;"></div>
+      <div id="s1-hl-notice" class="hl" style="left:317px; top:208px; width:197px;"></div>
+    </div>
+    <div id="s1-cap1" class="clip cap-host top" style="top: 40px;" data-start="0.2" data-duration="13.8"><div id="s1-cap1-in" class="chip">Sample letter · fictional member</div></div>
+    <div id="s1-cap3" class="clip cap-host" data-start="1.6" data-duration="2.9"><div id="s1-cap3-in" class="cap device">Her name, member ID, claim number…</div></div>
+    <div id="s1-cap2" class="clip cap-host" data-start="8.7" data-duration="5.3"><div id="s1-cap2-in" class="cap">Finds the clause · drafts the appeal · keeps the letter</div></div>
+    <div id="s1-q" class="clip" data-start="4.6" data-duration="9.4" data-hold="true">
+      <div id="s1-q-in"><div id="s1-q-text">“My plan has an after-hours exception. Does it apply here?”</div><div id="s1-q-who">Elena's question</div></div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const wipeIn = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "expo.out" }, at);
+    const wipeOut = (sel, at) => tl.fromTo(sel, { clipPath: "inset(0 0% 0 0)" }, { clipPath: "inset(0 0% 0 100%)", duration: 0.3, ease: "power2.in" }, at);
+    tl.fromTo("#s1-hl-name", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.22, ease: "power2.out" }, 0.25);
+    tl.fromTo("#s1-hl-dob", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.22, ease: "power2.out" }, 0.45);
+    tl.fromTo("#s1-hl-mid", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.22, ease: "power2.out" }, 0.65);
+    tl.fromTo("#s1-hl-addr", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.22, ease: "power2.out" }, 0.85);
+    tl.fromTo("#s1-hl-claim", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.22, ease: "power2.out" }, 1.05);
+    tl.fromTo("#s1-hl-notice", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.22, ease: "power2.out" }, 1.25);
+    tl.fromTo("#s1-frame", { scale: 1 }, { scale: 1.32, duration: 0.6, ease: "power3.inOut" }, 1.55);
+    wipeIn("#s1-cap1-in", 0.2);
+    wipeIn("#s1-cap3-in", 1.6);
+    wipeOut("#s1-cap3-in", 4.3);
+    wipeIn("#s1-q-in", 4.6);
+    wipeIn("#s1-cap2-in", 8.7);
+    window.__timelines["s1"] = tl;
+  </script>
+</template>
