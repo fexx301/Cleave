@@ -13,7 +13,7 @@
 [![Unit Tests](https://img.shields.io/badge/tests-35%20passing-156144)](#local-development--web--native-ios)
 [![Leaked Canaries](https://img.shields.io/badge/wire%20leaks-0%20%2F%2050%20canaries-156144)](#verified-evaluation-evidence-observed-2026-11-25-on-chrome-158--firebase-ai-logic)
 
-**[Live Hosted Web App](https://cleave-5a82b.web.app)** *(zero-setup, App Check enforced — works with Chrome Gemini Nano, opt-in Local Rules live mode in any browser, or Recorded Replay)* · **[For Judges](#for-judges-rubric-map)** · **[Architecture](#architecture)** · **[Product Tour](#product-tour)** · **[3 SDK Findings](#three-empirical-firebase--on-device-findings)** · **[Benchmark](#verified-evaluation-evidence-observed-2026-11-25-on-chrome-158--firebase-ai-logic)** · **[Local Setup](#local-development--web--native-ios)**
+**[Live Hosted Web App](https://cleave-5a82b.web.app)** *(zero-setup, App Check enforced — works with Chrome Gemini Nano, opt-in Local Rules live mode in any browser, or Recorded Replay)* · **[iOS Simulator Build](https://github.com/fexx301/Cleave/releases/tag/ios-simulator-v1)** *(no compiling: drag onto an iOS 27 Simulator)* · **[For Judges](#for-judges-rubric-map)** · **[Architecture](#architecture)** · **[Product Tour](#product-tour)** · **[3 SDK Findings](#three-empirical-firebase--on-device-findings)** · **[Benchmark](#verified-evaluation-evidence-observed-2026-11-25-on-chrome-158--firebase-ai-logic)** · **[Local Setup](#local-development--web--native-ios)**
 
 ## What sets Cleave apart
 
