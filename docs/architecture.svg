@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 486" width="1120" height="486" role="img" aria-label="Cleave Hybrid Privacy Architecture: local letter and identity vault stay on-device via ONLY_ON_DEVICE, a deterministic allowlist code gate permits only non-identifying claim facts to reach Firebase AI Logic ONLY_IN_CLOUD with Plan EOC clauses, and opaque placeholders are re-joined locally on device.">
+  <defs>
+    <style>
+      .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif; }
+      .serif { font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    </style>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#9A5B00" />
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#1B4F91" />
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#156144" />
+    </marker>
+  </defs>
+
+  <!-- Outer archival canvas -->
+  <rect x="2" y="2" width="1116" height="482" rx="16" fill="#FAF8F4" stroke="#DDD6C9" stroke-width="1.5" />
+
+  <!-- Header -->
+  <text x="30" y="34" class="mono" font-size="11" font-weight="700" letter-spacing="1.2" fill="#5A6470">CLEAVE · FIREBASE AI LOGIC HYBRID ARCHITECTURE</text>
+  <text x="30" y="58" class="serif" font-size="20" font-weight="600" fill="#14191F">Split the secret from the math. Re-join only on your device.</text>
+  <rect x="822" y="22" width="268" height="32" rx="16" fill="#EDF6F1" stroke="#B7DEC8" stroke-width="1" />
+  <circle cx="838" cy="38" r="4" fill="#156144" />
+  <text x="850" y="42" class="mono" font-size="11" font-weight="600" fill="#156144">Web Chrome Nano + Native iOS 27</text>
+
+  <!-- ZONE 1: ON DEVICE -->
+  <rect x="28" y="78" width="346" height="278" rx="12" fill="#EDF6F1" stroke="#B7DEC8" stroke-width="1.5" />
+  <rect x="44" y="92" width="222" height="22" rx="11" fill="#156144" />
+  <text x="56" y="107" class="mono" font-size="10.5" font-weight="700" fill="#FFFFFF">1. STAYS ON YOUR DEVICE · 0 HTTP</text>
+
+  <!-- Z1 Box 1 -->
+  <rect x="44" y="124" width="314" height="54" rx="8" fill="#FFFFFF" stroke="#C7E3D3" stroke-width="1" />
+  <text x="56" y="143" class="sans" font-size="13" font-weight="700" fill="#14191F">Original Denial Letter / Local PDF</text>
+  <text x="56" y="161" class="sans" font-size="11.5" fill="#4B5563">Parsed in memory (pdfjs-dist Web · PDFKit iOS)</text>
+  <text x="56" y="173" class="mono" font-size="10" fill="#156144">0 PDF bytes uploaded · PREFER_ON_DEVICE forbidden</text>
+
+  <!-- Z1 Arrow -->
+  <line x1="201" y1="178" x2="201" y2="195" stroke="#156144" stroke-width="1.75" marker-end="url(#arrow-green)" />
+
+  <!-- Z1 Box 2 -->
+  <rect x="44" y="198" width="314" height="58" rx="8" fill="#FFFFFF" stroke="#C7E3D3" stroke-width="1" />
+  <text x="56" y="217" class="sans" font-size="13" font-weight="700" fill="#14191F">On-Device Model (ONLY_ON_DEVICE)</text>
+  <text x="56" y="234" class="sans" font-size="11.5" fill="#4B5563">Chrome Gemini Nano · iOS Apple Foundation Models</text>
+  <text x="56" y="249" class="mono" font-size="9.5" fill="#5A6470">Pre-checks LanguageModel · opt-in rules fallback</text>
+
+  <!-- Z1 Arrow -->
+  <line x1="201" y1="256" x2="201" y2="273" stroke="#156144" stroke-width="1.75" marker-end="url(#arrow-green)" />
+
+  <!-- Z1 Box 3: Identity Vault -->
+  <rect x="44" y="276" width="314" height="66" rx="8" fill="#FFFFFF" stroke="#156144" stroke-width="1.25" stroke-dasharray="4 3" />
+  <text x="56" y="295" class="sans" font-size="12.5" font-weight="700" fill="#156144">Local Identity Vault (Never Leaves Device)</text>
+  <rect x="56" y="303" width="96" height="20" rx="4" fill="#E3F2EA" />
+  <text x="64" y="317" class="mono" font-size="10" fill="#114C36">Elena Vasquez</text>
+  <rect x="158" y="303" width="90" height="20" rx="4" fill="#E3F2EA" />
+  <text x="166" y="317" class="mono" font-size="10" fill="#114C36">MBR-8841209</text>
+  <rect x="254" y="303" width="92" height="20" rx="4" fill="#E3F2EA" />
+  <text x="262" y="317" class="mono" font-size="10" fill="#114C36">CLM-2026-99</text>
+  <text x="56" y="335" class="mono" font-size="9.5" fill="#4B5563">+ DOB, address, exact dates, physician, facility</text>
+
+  <!-- Connector 1 -> 2 -->
+  <line x1="374" y1="224" x2="404" y2="224" stroke="#9A5B00" stroke-width="2" marker-end="url(#arrow-amber)" />
+
+  <!-- ZONE 2: DETERMINISTIC CODE GATE -->
+  <rect x="408" y="78" width="298" height="278" rx="12" fill="#FFF9EC" stroke="#E5CC95" stroke-width="1.5" />
+  <rect x="424" y="92" width="218" height="22" rx="11" fill="#9A5B00" />
+  <text x="436" y="107" class="mono" font-size="10.5" font-weight="700" fill="#FFFFFF">2. DETERMINISTIC CODE GATE</text>
+  <text x="424" y="131" class="sans" font-size="12" font-weight="600" fill="#5F3B00">AI proposes · Code decides · You control</text>
+
+  <!-- Typed Allowlist JSON Box -->
+  <rect x="424" y="142" width="266" height="148" rx="8" fill="#FFFFFF" stroke="#E5CC95" stroke-width="1" />
+  <text x="436" y="160" class="mono" font-size="10.5" font-weight="700" fill="#14191F">TYPED ALLOWLIST ONLY (~256 B)</text>
+  <text x="436" y="179" class="mono" font-size="10.5" fill="#156144">☑ plan_id: "PLAN-HMO-2026-GOLD"</text>
+  <text x="436" y="196" class="mono" font-size="10.5" fill="#1F2937">☑ denial:  "MISSING_REFERRAL"</text>
+  <text x="436" y="213" class="mono" font-size="10.5" fill="#1F2937">☑ setting: "AFTER_HOURS_URGENT"</text>
+  <text x="436" y="230" class="mono" font-size="10.5" fill="#1F2937">☑ after_hours: "YES" · net: "OON"</text>
+  <text x="436" y="247" class="mono" font-size="10.5" fill="#1F2937">☑ days_since_denial: 11</text>
+  <text x="436" y="264" class="mono" font-size="10.5" fill="#1F2937">☑ days_since_service: 19</text>
+  <text x="436" y="281" class="sans" font-size="10.5" fill="#6B7280">Uncheck Plan ID → General Guidance Only</text>
+
+  <!-- Guard Strip -->
+  <rect x="424" y="300" width="266" height="42" rx="8" fill="#FEF2F2" stroke="#F5C2C2" stroke-width="1" />
+  <text x="436" y="317" class="mono" font-size="10" font-weight="700" fill="#991B1B">4 NAMED REFUSALS · 0 RAW PROSE</text>
+  <text x="436" y="333" class="sans" font-size="10.5" fill="#7F1D1D">Scans JSON against every vault value &amp; PII regex</text>
+
+  <!-- Connector 2 -> 3 -->
+  <line x1="706" y1="224" x2="736" y2="224" stroke="#1B4F91" stroke-width="2" marker-end="url(#arrow-blue)" />
+
+  <!-- ZONE 3: CLOUD POLICY REASONING -->
+  <rect x="740" y="78" width="352" height="278" rx="12" fill="#EEF4FC" stroke="#B9D0EF" stroke-width="1.5" />
+  <rect x="756" y="92" width="252" height="22" rx="11" fill="#1B4F91" />
+  <text x="768" y="107" class="mono" font-size="10.5" font-weight="700" fill="#FFFFFF">3. CLOUD CLAUSE MATCH · ONLY_IN_CLOUD</text>
+
+  <!-- Z3 Box 1 -->
+  <rect x="756" y="124" width="320" height="54" rx="8" fill="#FFFFFF" stroke="#C5D8F2" stroke-width="1" />
+  <text x="768" y="143" class="sans" font-size="13" font-weight="700" fill="#14191F">Firebase AI Logic (gemini-3.5-flash-lite)</text>
+  <text x="768" y="160" class="sans" font-size="11.5" fill="#4B5563">Web @firebase/ai · iOS GeminiLanguageModel 13.2</text>
+  <text x="768" y="173" class="mono" font-size="10" fill="#1B4F91">App Check Enforced (Fraud Defense / App Attest)</text>
+
+  <!-- Z3 Box 2 -->
+  <rect x="756" y="188" width="320" height="48" rx="8" fill="#FFFFFF" stroke="#C5D8F2" stroke-width="1" />
+  <text x="768" y="207" class="sans" font-size="12.5" font-weight="700" fill="#14191F">Built-in or BYO Plan EOC PDF</text>
+  <text x="768" y="224" class="sans" font-size="11.5" fill="#4B5563">Public coverage clauses · PII-checked before upload</text>
+
+  <!-- Z3 Box 3 -->
+  <rect x="756" y="246" width="320" height="96" rx="8" fill="#FFFFFF" stroke="#1B4F91" stroke-width="1.25" />
+  <text x="768" y="265" class="sans" font-size="12.5" font-weight="700" fill="#1B4F91">Structured Policy Verdict + Placeholders</text>
+  <text x="768" y="283" class="sans" font-size="11.5" fill="#1F2937">• Exact verbatim clause quote (e.g. Section 4.2(a))</text>
+  <text x="768" y="300" class="sans" font-size="11.5" fill="#1F2937">• Unresolved-fact checklist (never fabricates claims)</text>
+  <text x="768" y="317" class="sans" font-size="11.5" fill="#1F2937">• Draft uses only opaque tokens:</text>
+  <text x="768" y="333" class="mono" font-size="9.5" fill="#1B4F91">[MEMBER_NAME] [CLAIM_ID] [SERVICE_DATE]</text>
+
+  <!-- Return arrow from Zone 3 down into Zone 4 -->
+  <path d="M 916 356 L 916 376" stroke="#156144" stroke-width="2" marker-end="url(#arrow-green)" />
+
+  <!-- ZONE 4: BOTTOM LOCAL RE-JOIN BAND -->
+  <rect x="28" y="380" width="1064" height="84" rx="12" fill="#FFFFFF" stroke="#B7DEC8" stroke-width="1.5" />
+  <rect x="44" y="394" width="236" height="22" rx="11" fill="#156144" />
+  <text x="56" y="409" class="mono" font-size="10.5" font-weight="700" fill="#FFFFFF">4. LOCAL RE-JOIN ON DEVICE · 0 HTTP</text>
+  <text x="44" y="434" class="sans" font-size="13" font-weight="600" fill="#14191F">Opaque placeholders + checked patient confirmations merge locally with the Vault</text>
+  <text x="44" y="452" class="sans" font-size="11.5" fill="#4B5563">Editable Request for Review (Copy / Download / Print) · Plus PREFER_IN_CLOUD Offline Local Triage</text>
+
+  <!-- Proof badge inside bottom band -->
+  <rect x="764" y="396" width="312" height="52" rx="8" fill="#EDF6F1" stroke="#B7DEC8" stroke-width="1" />
+  <text x="778" y="416" class="mono" font-size="11" font-weight="700" fill="#156144">MEASURED BENCHMARK PROOF</text>
+  <text x="778" y="435" class="mono" font-size="11" fill="#14191F">0 / 50 leaks · 6 / 6 clause pass · 0 orphans</text>
+</svg>
