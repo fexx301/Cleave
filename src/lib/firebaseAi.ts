@@ -19,6 +19,7 @@ import {
   detectNetworkStatusCue,
   detectOngoingTreatmentCue,
   detectPlanIdCue,
+  detectScheduledNonUrgentCue,
   detectServiceSettingCue,
   detectUrgencyDocumentedCue,
   dropPlanCodeFromVault,
@@ -618,10 +619,13 @@ ${rawLetter}`;
         !nanoProp.denial_reason_code || nanoProp.denial_reason_code === "OTHER"
           ? detDenialReason || nanoProp.denial_reason_code || "OTHER"
           : nanoProp.denial_reason_code,
+      // Nano proposes; code overrules an "emergency" label on a letter that says the visit was scheduled or routine.
       service_setting:
         !nanoProp.service_setting || nanoProp.service_setting === "UNKNOWN"
           ? detServiceSetting || nanoProp.service_setting || "UNKNOWN"
-          : nanoProp.service_setting,
+          : nanoProp.service_setting === "EMERGENCY_OR_AFTER_HOURS_URGENT" && detectScheduledNonUrgentCue(rawLetter)
+            ? detServiceSetting || "ELECTIVE_OUTPATIENT_SPECIALIST"
+            : nanoProp.service_setting,
       network_status:
         !nanoProp.network_status || nanoProp.network_status === "UNKNOWN"
           ? detNetwork || nanoProp.network_status || "UNKNOWN"

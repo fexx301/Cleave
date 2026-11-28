@@ -62,7 +62,8 @@ describe("held-out floor (code-only on-device path)", () => {
     // Report only on an explicit eval run (npm run eval:holdout), so plain `npm test` never "runs the held-out eval".
     if (process.env.HOLDOUT_REPORT) {
       mkdirSync("eval", { recursive: true });
-      writeFileSync("eval/holdout-floor.json", JSON.stringify(summary, null, 2) + "\n");
+      // HOLDOUT_OUT keeps the first-run record intact when re-running after fixes.
+      writeFileSync(process.env.HOLDOUT_OUT || "eval/holdout-floor.json", JSON.stringify(summary, null, 2) + "\n");
       console.table(
       done.map((r) => ({
         id: r.id,

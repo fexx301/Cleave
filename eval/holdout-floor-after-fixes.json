@@ -1,0 +1,249 @@
+{
+  "set": "holdout (12 letters, pre-registered)",
+  "referenceDate": "2026-11-25",
+  "layer": "code-only on-device rules (extractWithLocalRules), no Gemini Nano, 0 network",
+  "letters": 12,
+  "plantedIdentifiers": 83,
+  "refusals": 0,
+  "cleavePayloadLeaks": 0,
+  "manualBaselineLeaks": 49,
+  "rejoinCoverage": "53 / 83",
+  "daysSinceServiceCorrect": "7 / 12",
+  "daysSinceDenialCorrect": "10 / 12",
+  "cases": [
+    {
+      "id": "holdout-01",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 1,
+      "canaries": 8,
+      "missedInVault": [
+        "Adaeze Okafor",
+        "2026-1103-7781",
+        "Lakeshore Urgent Care",
+        "October 31, 2026",
+        "W2287741903",
+        "(312) 555-0147",
+        "88 Birchwood Lane"
+      ],
+      "daysServiceOk": false,
+      "daysDenialOk": false,
+      "manualBaselineLeaks": [
+        "2026-1103-7781",
+        "Lakeshore Urgent Care",
+        "October 31, 2026",
+        "W2287741903",
+        "Priya Raman",
+        "(312) 555-0147",
+        "88 Birchwood Lane"
+      ]
+    },
+    {
+      "id": "holdout-02",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 4,
+      "canaries": 8,
+      "missedInVault": [
+        "Jamal Okeke",
+        "Hannah Lindqvist",
+        "Brightwater Family Counseling",
+        "1487726354"
+      ],
+      "daysServiceOk": false,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Hannah Lindqvist",
+        "Brightwater Family Counseling",
+        "1487726354"
+      ]
+    },
+    {
+      "id": "holdout-03",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 6,
+      "canaries": 7,
+      "missedInVault": [
+        "Northgate Imaging Partners"
+      ],
+      "daysServiceOk": true,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Helena Marsh",
+        "Northgate Imaging Partners",
+        "November 15, 2026"
+      ]
+    },
+    {
+      "id": "holdout-04",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 3,
+      "canaries": 6,
+      "missedInVault": [
+        "Rosalind Achterberg",
+        "Cedar Hollow Dermatology",
+        "October 6, 2026"
+      ],
+      "daysServiceOk": false,
+      "daysDenialOk": false,
+      "manualBaselineLeaks": [
+        "Felix Brandt",
+        "Cedar Hollow Dermatology",
+        "October 6, 2026"
+      ]
+    },
+    {
+      "id": "holdout-05",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 6,
+      "canaries": 7,
+      "missedInVault": [
+        "Riverside Oncology Associates"
+      ],
+      "daysServiceOk": true,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Ingrid Solheim",
+        "Riverside Oncology Associates",
+        "November 3, 2026"
+      ]
+    },
+    {
+      "id": "holdout-06",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 4,
+      "canaries": 6,
+      "missedInVault": [
+        "Siobhan Kavanagh-Ruiz",
+        "Elmstead Women's Health"
+      ],
+      "daysServiceOk": true,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Siobhan Kavanagh-Ruiz",
+        "MBR-2218840",
+        "CLM-2026-439915",
+        "Amara Nwosu",
+        "Elmstead Women's Health",
+        "October 27, 2026"
+      ]
+    },
+    {
+      "id": "holdout-07",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 3,
+      "canaries": 7,
+      "missedInVault": [
+        "Mei-Lin Castellanos",
+        "October 14, 2026",
+        "Harborview Midwifery Collective",
+        "mlcastellanos@mailbox.example"
+      ],
+      "daysServiceOk": false,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Mei-Lin Castellanos",
+        "CLM-2026-118463",
+        "MBR-7741352",
+        "October 14, 2026",
+        "Rafaela Dumont",
+        "Harborview Midwifery Collective",
+        "mlcastellanos@mailbox.example"
+      ]
+    },
+    {
+      "id": "holdout-08",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 6,
+      "canaries": 7,
+      "missedInVault": [
+        "Bartholomew Nkemelu"
+      ],
+      "daysServiceOk": true,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Saint Brendan Hospital",
+        "Yusuf Haddad",
+        "November 8, 2026"
+      ]
+    },
+    {
+      "id": "holdout-09",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 5,
+      "canaries": 7,
+      "missedInVault": [
+        "Ottoline Fairweather",
+        "Summit Heart Clinic"
+      ],
+      "daysServiceOk": true,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Kenji Watanabe",
+        "Summit Heart Clinic",
+        "October 29, 2026"
+      ]
+    },
+    {
+      "id": "holdout-10",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 4,
+      "canaries": 6,
+      "missedInVault": [
+        "Westbrook Diagnostic Center",
+        "Samuel Okonkwo-Baird"
+      ],
+      "daysServiceOk": true,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Westbrook Diagnostic Center",
+        "Samuel Okonkwo-Baird",
+        "November 19, 2026"
+      ]
+    },
+    {
+      "id": "holdout-11",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 3,
+      "canaries": 6,
+      "missedInVault": [
+        "Caspian Lindgren-Obi",
+        "September 15, 2026",
+        "Alder Ridge Orthopedics"
+      ],
+      "daysServiceOk": false,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "CLM-2026-304412",
+        "September 15, 2026",
+        "Beatriz Montoya",
+        "Alder Ridge Orthopedics",
+        "MBR-5107733"
+      ]
+    },
+    {
+      "id": "holdout-12",
+      "refused": null,
+      "payloadLeaks": [],
+      "vaultCaptured": 8,
+      "canaries": 8,
+      "missedInVault": [],
+      "daysServiceOk": true,
+      "daysDenialOk": true,
+      "manualBaselineLeaks": [
+        "Fernwood Urgent Care",
+        "Tobias Engel",
+        "September 7, 2026"
+      ]
+    }
+  ]
+}

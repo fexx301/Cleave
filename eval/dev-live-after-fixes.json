@@ -1,0 +1,366 @@
+{
+  "timestamp": "2026-11-28T08:22:30.055Z",
+  "cloudModel": "gemini-3.5-flash-lite",
+  "totalCases": 6,
+  "totalPlantedCanaries": 50,
+  "completedCases": 6,
+  "falseRefusals": 0,
+  "validDeterministicRefusals": 3,
+  "cleaveLeaks": 0,
+  "cleaveClauseMatches": 6,
+  "cleaveExactPasses": 6,
+  "manualLeaks": 8,
+  "manualClauseMatches": 4,
+  "manualExactPasses": 4,
+  "cases": [
+    {
+      "id": "case-1",
+      "title": "Case 1 — After-Hours Urgent Care (Clause 4.2(a))",
+      "canaryCount": 8,
+      "groundTruth": {
+        "expected_clause": "4.2(a)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 19,
+        "expected_days_since_denial": 11
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "EMERGENCY_OR_AFTER_HOURS_URGENT",
+          "after_hours_visit_confirmed": "YES",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_service": 19,
+          "days_since_denial": 11,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.2(a) / 8.2",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 8,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": false,
+        "leakedCanaries": [
+          "Dr. Marcus Thornton"
+        ],
+        "citedClause": "NONE",
+        "exceptionApplies": "UNKNOWN_NO_POLICY",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": false,
+          "exceptionMatch": false,
+          "confirmationMatch": false,
+          "exactPass": false
+        }
+      }
+    },
+    {
+      "id": "case-2",
+      "title": "Case 2 — In-Network OB-GYN Direct Access (Clause 4.3(b))",
+      "canaryCount": 8,
+      "groundTruth": {
+        "expected_clause": "4.3(b)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 23,
+        "expected_days_since_denial": 15
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "OUTPATIENT_OBGYN",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "IN_NETWORK",
+          "days_since_service": 23,
+          "days_since_denial": 15,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.3(b) / 8.2",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 8,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "555-014-8821"
+        ],
+        "citedClause": "4.1",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": false,
+          "exceptionMatch": false,
+          "confirmationMatch": false,
+          "exactPass": false
+        }
+      }
+    },
+    {
+      "id": "case-3",
+      "title": "Case 3 — Retroactive MRI Prior Auth (Needs Confirmation: 5.1(c))",
+      "canaryCount": 9,
+      "groundTruth": {
+        "expected_clause": "5.1(c)",
+        "exception_applies": "CONDITIONAL",
+        "requires_patient_confirmation": true,
+        "expected_confirmation_topic": "clinical urgency documentation by ordering physician within 14-day window",
+        "expected_days_since_service": 10,
+        "expected_days_since_denial": 5
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_PRIOR_AUTH",
+          "service_setting": "ADVANCED_DIAGNOSTIC_IMAGING",
+          "after_hours_visit_confirmed": "NOT_MENTIONED",
+          "network_status": "IN_NETWORK",
+          "days_since_service": 10,
+          "days_since_denial": 5,
+          "urgency_documented": "NO",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "5.1(c)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 9,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "d.okafor78@example.net"
+        ],
+        "citedClause": "5.1(c)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "case-4",
+      "title": "Case 4 — Continuity-of-Care Post-Op (Needs Confirmation: 6.4(a))",
+      "canaryCount": 8,
+      "groundTruth": {
+        "expected_clause": "6.4(a)",
+        "exception_applies": "CONDITIONAL",
+        "requires_patient_confirmation": true,
+        "expected_confirmation_topic": "plan effective enrollment date within 90 calendar days",
+        "expected_days_since_service": 28,
+        "expected_days_since_denial": 13
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "POST_OP_SPECIALIST_FOLLOWUP",
+          "after_hours_visit_confirmed": "NOT_MENTIONED",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_service": 28,
+          "days_since_denial": 13,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "YES",
+          "enrollment_date_known": "NO"
+        },
+        "leakedCanaries": [],
+        "citedClause": "6.4(a) / 8.2",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 8,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Harborview Orthopedic Associates",
+          "GRP-44910-ACME"
+        ],
+        "citedClause": "6.4(a)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "case-5",
+      "title": "Case 5 — Behavioral Health + Messy OCR (Clause 4.4(a))",
+      "canaryCount": 9,
+      "groundTruth": {
+        "expected_clause": "4.4(a)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 16,
+        "expected_days_since_denial": 7
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "OUTPATIENT_BEHAVIORAL_HEALTH",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "IN_NETWORK",
+          "days_since_service": 16,
+          "days_since_denial": 7,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.4(a) / 8.2",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 9,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "04/12/1995",
+          "Dr. Miriam Goldstein",
+          "Oakridge Behavioral Wellness"
+        ],
+        "citedClause": "4.4(a)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "case-6",
+      "title": "Case 6 — Elective OON + Expired 180-Day Window (Honest Negative)",
+      "canaryCount": 8,
+      "groundTruth": {
+        "expected_clause": "4.1 / 8.2",
+        "exception_applies": "NO",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 225,
+        "expected_days_since_denial": 210
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL_AND_OON",
+          "service_setting": "ELECTIVE_OUTPATIENT_SPECIALIST",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_service": 225,
+          "days_since_denial": 210,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NO"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.1 / 8.2",
+        "exceptionApplies": "NO",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 8,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [],
+        "citedClause": "4.1",
+        "exceptionApplies": "NO",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    }
+  ]
+}

@@ -301,7 +301,23 @@ export function detectAfterHoursCue(rawLetter: string): "YES" | "NOT_MENTIONED" 
   const hasExplicitPhrase = /\b(?:after-hours|after hours|emergency services|emergency room|weekend|holiday)\b/i.test(
     rawLetter
   );
-  return hasLateHour || hasExplicitPhrase ? "YES" : "NOT_MENTIONED";
+  // Plans waive referrals on weekends and holidays too, and letters name the day rather than say "holiday".
+  const hasWeekendOrNamedHoliday =
+    /\b(?:Saturday|Sunday|New Year's Day|Martin Luther King(?: Jr\.?)? Day|Presidents'? Day|Memorial Day|Juneteenth|Independence Day|July 4th|Labor Day|Columbus Day|Indigenous Peoples'? Day|Veterans Day|Thanksgiving(?: Day)?|Christmas Day)\b/i.test(
+      rawLetter
+    );
+  return hasLateHour || hasExplicitPhrase || hasWeekendOrNamedHoliday ? "YES" : "NOT_MENTIONED";
+}
+
+/**
+ * A scheduled, routine or explicitly non-emergency visit with no emergency, urgent-care or after-hours cue.
+ * Used only to overrule an on-device "emergency" label the letter doesn't support.
+ */
+export function detectScheduledNonUrgentCue(rawLetter: string): boolean {
+  const scheduled = /\b(?:scheduled|routine|elective|preventive|non-emergency)\b/i.test(rawLetter);
+  const urgentCue =
+    /(?<!non-)\bemergency\b|\burgent care\b|\bstabiliz/i.test(rawLetter) || detectAfterHoursCue(rawLetter) === "YES";
+  return scheduled && !urgentCue;
 }
 
 /**
@@ -329,7 +345,9 @@ export function detectServiceSettingCue(rawLetter: string): ServiceSetting | nul
   if (detectAfterHoursCue(rawLetter) === "YES" && /\b(?:urgent care|emergency)\b/i.test(rawLetter)) {
     return "EMERGENCY_OR_AFTER_HOURS_URGENT";
   }
-  if (/\b(?:elective|cosmetic)\b/i.test(rawLetter)) return "ELECTIVE_OUTPATIENT_SPECIALIST";
+  if (/\b(?:elective|cosmetic)\b/i.test(rawLetter) || detectScheduledNonUrgentCue(rawLetter)) {
+    return "ELECTIVE_OUTPATIENT_SPECIALIST";
+  }
   return null;
 }
 

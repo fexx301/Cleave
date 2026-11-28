@@ -235,3 +235,20 @@ describe("Cleave deterministic code gate & allowlist boundary", () => {
     expect(totalLeaks).toBe(0);
   });
 });
+
+describe("held-out fixes (reported separately from the held-out result)", () => {
+  it("treats weekends and named public holidays as after-hours", async () => {
+    const { detectAfterHoursCue } = await import("../src/lib/gate");
+    expect(detectAfterHoursCue("Date of Service: September 7, 2026 (Labor Day, check-in 2:05 PM)")).toBe("YES");
+    expect(detectAfterHoursCue("Visit on Sunday, November 15, 2026")).toBe("YES");
+    expect(detectAfterHoursCue("Appointment Tuesday at 10:15 AM")).toBe("NOT_MENTIONED");
+  });
+  it("overrules an emergency label only for scheduled, non-urgent letters", async () => {
+    const { detectScheduledNonUrgentCue, detectServiceSettingCue } = await import("../src/lib/gate");
+    const knee = "visit for a scheduled knee consultation. Reason Code: NET-03 (Out-of-network non-emergency service).";
+    expect(detectScheduledNonUrgentCue(knee)).toBe(true);
+    expect(detectServiceSettingCue(knee)).toBe("ELECTIVE_OUTPATIENT_SPECIALIST");
+    expect(detectScheduledNonUrgentCue("Scheduled follow-up after an emergency department visit")).toBe(false);
+    expect(detectScheduledNonUrgentCue("Routine visit, arrival 2:10 AM")).toBe(false);
+  });
+});

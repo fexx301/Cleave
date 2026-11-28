@@ -83,6 +83,23 @@ The baseline sends the whole redacted letter, so the cloud sees full context. Th
 - **Day counts:** dates written only in prose (01, 02, 07, 11) or in a pipe table (04) were not counted. Those fields were left out of the payload rather than guessed; no case failed because of it.
 - **Re-join:** 7 identifiers across 01, 02, 04, 07 and 11 were not captured locally. They are left as visible blanks in the draft, not sent anywhere.
 
-### After fixes
+### After fixes (not the held-out number)
 
-None yet. Any fix made because of these results will be reported here as a separate row, never as the held-out number.
+Two fixes were made *because of* the misses above. This means the held-out set has now influenced the code, so the numbers below are **not** a held-out result.
+
+1. **Weekends and named public holidays count as after-hours** (`detectAfterHoursCue`): "Saturday", "Sunday", "Labor Day", "Thanksgiving" and the other US federal holidays. Plan clauses like 4.2(a) cover weekends and holidays.
+2. **Code overrules an on-device "emergency" label** when the letter says the visit was scheduled, routine, elective, preventive or non-emergency, and has no emergency, urgent-care or after-hours cue (`detectScheduledNonUrgentCue`).
+
+Checked before re-running: across all 18 letters (dev + held-out), the fixes change the detected cues of exactly three: held-out 01 (Saturday, newly flagged after-hours), 11 and 12. None of the six dev cases changes.
+
+| Run | Cleave exact | Cleave leaks | Baseline exact | Baseline leaks | Vault capture | Draft blanks |
+|---|---|---|---|---|---|---|
+| Held-out, first run (the result) | 10 / 12 | 0 / 83 | 9 / 12 | 49 / 83 | 76 / 83 | 7 |
+| Held-out, after fixes (`eval/holdout-live-after-fixes.json`) | 12 / 12 | 0 / 83 | 11 / 12 | 49 / 83 | 75 / 83 | 8 |
+| Dev set, after fixes, regression check (`eval/dev-live-after-fixes.json`) | 6 / 6 | 0 / 50 | 4 / 6 | 8 / 50 | 50 / 50 | 0 |
+
+**Read with care:**
+- The baseline's code did not change, yet it went from 9/12 to 11/12. That is run-to-run variation in the cloud model.
+- One run per row cannot separate Cleave's fix from that noise. What *is* shown is the mechanism: the two failing letters now carry the deciding fact (holiday or after-hours, and a non-emergency setting) in their outgoing payload, and both pass.
+- Vault capture also varies by run (76 then 75), because Gemini Nano's output is not fully deterministic.
+- The floor (code-only) numbers are unchanged after the fixes (`eval/holdout-floor-after-fixes.json`), because the floor does not score verdicts.
