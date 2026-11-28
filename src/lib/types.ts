@@ -198,6 +198,8 @@ export interface CaseEvalReport {
     exceptionApplies?: string;
     needsConfirmation?: boolean;
     orphanPlaceholders?: string[];
+    /** Planted identifiers the local vault captured (for the on-device re-join). */
+    vaultCaptured?: number;
     score?: CaseScore;
   };
   manualBaseline?: {

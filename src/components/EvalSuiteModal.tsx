@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BENCHMARK_REFERENCE_DATE, SYNTHETIC_CASES, TOTAL_CANARIES } from "../lib/cases";
+import { HOLDOUT_CASES, HOLDOUT_TOTAL_CANARIES } from "../lib/holdoutCases";
 import { analyzeAllowlistInCloud, extractOnDevice, runManualBaselineCloud } from "../lib/firebaseAi";
 import {
   ALLOWED_KEYS,
@@ -24,6 +25,7 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
   const [progressLine, setProgressLine] = useState<string>("");
   const [summary, setSummary] = useState<SuiteEvalSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [caseSet, setCaseSet] = useState<"dev" | "holdout">("dev");
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +39,8 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
   if (!open) return null;
 
   async function handleRunSuite() {
+    const CASES = caseSet === "holdout" ? HOLDOUT_CASES : SYNTHETIC_CASES;
+    const TOTAL = caseSet === "holdout" ? HOLDOUT_TOTAL_CANARIES : TOTAL_CANARIES;
     setRunning(true);
     setError(null);
     setSummary(null);
@@ -67,9 +71,9 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
     ].filter(Boolean).length;
 
     try {
-      for (let i = 0; i < SYNTHETIC_CASES.length; i++) {
-        const c = SYNTHETIC_CASES[i];
-        setProgressLine(`Running ${i + 1} / ${SYNTHETIC_CASES.length}: ${c.shortTitle}...`);
+      for (let i = 0; i < CASES.length; i++) {
+        const c = CASES[i];
+        setProgressLine(`Running ${i + 1} / ${CASES.length}: ${c.shortTitle}...`);
 
         const report: CaseEvalReport = {
           id: c.id,
@@ -111,7 +115,7 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
               caseLabel: `Eval Cleave (${c.id})`,
               onRetry: (n) =>
                 setProgressLine(
-                  `${i + 1}/${SYNTHETIC_CASES.length} (${c.shortTitle}): ${
+                  `${i + 1}/${CASES.length} (${c.shortTitle}): ${
                     n.isRateLimit ? "Rate limited (429)" : "Cloud busy"
                   } — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s...`
                 )
@@ -135,6 +139,14 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
               exceptionApplies: cloudRes.analysis.exception_applies,
               needsConfirmation: cloudRes.analysis.needs_patient_confirmation,
               orphanPlaceholders: rejoined.orphanPlaceholders,
+              vaultCaptured: c.canaries.filter((k) =>
+                Object.values(localRes.identityVault).some(
+                  (v) =>
+                    !!v &&
+                    (v.toLowerCase().includes(k.toLowerCase()) ||
+                      (v.length >= 6 && k.toLowerCase().includes(v.toLowerCase())))
+                )
+              ).length,
               score
             };
           }
@@ -142,7 +154,7 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
 
         const manualRes = await runManualBaselineCloud(c, cloudModel, (n) =>
           setProgressLine(
-            `${i + 1}/${SYNTHETIC_CASES.length} Manual Baseline: ${
+            `${i + 1}/${CASES.length} Manual Baseline: ${
               n.isRateLimit ? "Rate limited (429)" : "Cloud busy"
             } — retrying (${n.nextAttempt}/${n.maxAttempts}) in ${n.delaySec}s...`
           )
@@ -162,7 +174,7 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
         };
 
         caseReports.push(report);
-        if (i < SYNTHETIC_CASES.length - 1) {
+        if (i < CASES.length - 1) {
           await new Promise((r) => setTimeout(r, 2000));
         }
       }
@@ -170,8 +182,8 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
       setSummary({
         timestamp: new Date().toISOString(),
         cloudModel,
-        totalCases: SYNTHETIC_CASES.length,
-        totalPlantedCanaries: TOTAL_CANARIES,
+        totalCases: CASES.length,
+        totalPlantedCanaries: TOTAL,
         completedCases,
         falseRefusals,
         validDeterministicRefusals: validDetChecks,
@@ -183,7 +195,7 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
         manualExactPasses,
         cases: caseReports
       });
-      setProgressLine("Completed all 6 cases.");
+      setProgressLine(`Completed all ${CASES.length} cases.`);
     } catch (err) {
       setError((err as Error)?.message || String(err));
     } finally {
@@ -228,13 +240,20 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
           {firebaseReady ? (
             <button className="btn btn-primary" onClick={handleRunSuite} disabled={running}>
-              {running ? progressLine || "Running..." : "Run Live 6-Case Suite"}
+              {running ? progressLine || "Running..." : `Run Live ${caseSet === "holdout" ? "12-Case Held-Out" : "6-Case"} Suite`}
             </button>
           ) : (
             <button className="btn btn-primary" onClick={onOpenSettings}>
               Configure Firebase First
             </button>
           )}
+          <label className="pane-desc" style={{ display: "inline-flex", alignItems: "center", gap: 6, margin: 0 }}>
+            Case set
+            <select value={caseSet} onChange={(e) => setCaseSet(e.target.value as "dev" | "holdout")} disabled={running}>
+              <option value="dev">Dev set (6 cases, 50 identifiers)</option>
+              <option value="holdout">Held-out set (12 cases, pre-registered)</option>
+            </select>
+          </label>
           {summary && (
             <button className="btn" onClick={handleExport}>
               Export JSON Report

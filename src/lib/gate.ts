@@ -675,10 +675,10 @@ export function appendConfirmedPatientFacts(baseDraft: string, confirmedFacts: s
 export function scoreCaseAgainstGroundTruth(caseObj: SyntheticCase, analysis: CloudAnalysis): CaseScore {
   const gt = caseObj.ground_truth;
   const cited = String(analysis.cited_clause_id || "").toLowerCase();
-  const clauseMatch =
-    gt.expected_clause === "4.1 / 8.2"
-      ? cited.includes("4.1") || cited.includes("8.2")
-      : cited.includes(gt.expected_clause.toLowerCase());
+  // "A / B" in ground truth means either clause is a correct citation (e.g. an honest negative citable by either).
+  const clauseMatch = gt.expected_clause
+    .split(" / ")
+    .some((alt) => cited.includes(alt.trim().toLowerCase()));
   const exceptionMatch = analysis.exception_applies === gt.exception_applies;
   const confirmationMatch = Boolean(analysis.needs_patient_confirmation) === Boolean(gt.requires_patient_confirmation);
   return {
