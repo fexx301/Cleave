@@ -227,7 +227,7 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
           <div>
             <h2 className="modal-title">6-Case / 50-Identifier Benchmark</h2>
             <p className="pane-desc">
-              Runs 6 synthetic missing-referral &amp; prior-auth cases (50 planted personal identifiers) live against both
+              Runs the dev set (6 cases, 50 planted identifiers) or the pre-registered held-out set (12 cases, 83) live against both
               Cleave and a realistic manual-redaction baseline, tracking completed cases, refusals, leaks, and clause
               accuracy separately. Manual-baseline traffic is isolated from Cleave&apos;s production Wire Proof audit.
             </p>
@@ -293,7 +293,7 @@ export function EvalSuiteModal({ open, onClose, cloudModel, firebaseReady, onOpe
               <div className="metric-box">
                 <div className="metric-label">Completed / False Refusals</div>
                 <div className="metric-value">
-                  {summary.completedCases}/6 · {summary.falseRefusals}
+                  {summary.completedCases}/{summary.totalCases} · {summary.falseRefusals}
                 </div>
               </div>
             </div>

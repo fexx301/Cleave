@@ -1,0 +1,755 @@
+{
+  "timestamp": "2026-11-28T07:59:39.811Z",
+  "cloudModel": "gemini-3.5-flash-lite",
+  "totalCases": 12,
+  "totalPlantedCanaries": 83,
+  "completedCases": 12,
+  "falseRefusals": 0,
+  "validDeterministicRefusals": 3,
+  "cleaveLeaks": 0,
+  "cleaveClauseMatches": 10,
+  "cleaveExactPasses": 10,
+  "manualLeaks": 49,
+  "manualClauseMatches": 12,
+  "manualExactPasses": 9,
+  "cases": [
+    {
+      "id": "holdout-01",
+      "title": "Held-out 01 — Weekend urgent care, identifiers in prose (4.2(a))",
+      "canaryCount": 8,
+      "groundTruth": {
+        "expected_clause": "4.2(a)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 25,
+        "expected_days_since_denial": 16
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "EMERGENCY_OR_AFTER_HOURS_URGENT",
+          "after_hours_visit_confirmed": "YES",
+          "network_status": "IN_NETWORK",
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.2(a)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [
+          "[SERVICE_DATE]",
+          "[DENIAL_DATE]"
+        ],
+        "vaultCaptured": 6,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "2026-1103-7781",
+          "Lakeshore Urgent Care",
+          "October 31, 2026",
+          "W2287741903",
+          "Priya Raman",
+          "(312) 555-0147",
+          "88 Birchwood Lane"
+        ],
+        "citedClause": "4.2(a)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-02",
+      "title": "Held-out 02 — Dependent's in-network behavioral health visit (4.4(a))",
+      "canaryCount": 8,
+      "groundTruth": {
+        "expected_clause": "4.4(a)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 23,
+        "expected_days_since_denial": 13
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "OUTPATIENT_BEHAVIORAL_HEALTH",
+          "after_hours_visit_confirmed": "NOT_MENTIONED",
+          "network_status": "IN_NETWORK",
+          "days_since_denial": 13,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.4(a) / 8.2",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [
+          "[SERVICE_DATE]"
+        ],
+        "vaultCaptured": 6,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Hannah Lindqvist",
+          "Brightwater Family Counseling",
+          "1487726354"
+        ],
+        "citedClause": "4.4(a)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-03",
+      "title": "Held-out 03 — Urgent MRI, physician urgency documentation not stated (5.1(c))",
+      "canaryCount": 7,
+      "groundTruth": {
+        "expected_clause": "5.1(c)",
+        "exception_applies": "CONDITIONAL",
+        "requires_patient_confirmation": true,
+        "expected_confirmation_topic": "whether the ordering physician documented clinical urgency (request within 14 days)",
+        "expected_days_since_service": 10,
+        "expected_days_since_denial": 5
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_PRIOR_AUTH",
+          "service_setting": "ADVANCED_DIAGNOSTIC_IMAGING",
+          "after_hours_visit_confirmed": "NOT_MENTIONED",
+          "network_status": "UNKNOWN",
+          "days_since_service": 10,
+          "days_since_denial": 5,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "5.1(c)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 7,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Helena Marsh",
+          "Northgate Imaging Partners",
+          "November 15, 2026"
+        ],
+        "citedClause": "5.1(c)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-04",
+      "title": "Held-out 04 — Weekday elective out-of-network specialist, no referral (honest negative, 4.1)",
+      "canaryCount": 6,
+      "groundTruth": {
+        "expected_clause": "4.1",
+        "exception_applies": "NO",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 50,
+        "expected_days_since_denial": 36
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "ELECTIVE_OUTPATIENT_SPECIALIST",
+          "after_hours_visit_confirmed": "NOT_MENTIONED",
+          "network_status": "OUT_OF_NETWORK",
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.1 / 8.2",
+        "exceptionApplies": "NO",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [
+          "[SERVICE_DATE]",
+          "[DENIAL_DATE]"
+        ],
+        "vaultCaptured": 5,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Felix Brandt",
+          "Cedar Hollow Dermatology",
+          "October 6, 2026"
+        ],
+        "citedClause": "4.1",
+        "exceptionApplies": "NO",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-05",
+      "title": "Held-out 05 — New member in active oncology treatment, enrollment date not stated (6.4(a))",
+      "canaryCount": 7,
+      "groundTruth": {
+        "expected_clause": "6.4(a)",
+        "exception_applies": "CONDITIONAL",
+        "requires_patient_confirmation": true,
+        "expected_confirmation_topic": "whether the plan effective date was within 90 days of the visit",
+        "expected_days_since_service": 22,
+        "expected_days_since_denial": 12
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "ELECTIVE_OUTPATIENT_SPECIALIST",
+          "after_hours_visit_confirmed": "NOT_MENTIONED",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_service": 22,
+          "days_since_denial": 12,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "YES",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "6.4(a)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 7,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Ingrid Solheim",
+          "Riverside Oncology Associates",
+          "November 3, 2026"
+        ],
+        "citedClause": "6.4(a)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-06",
+      "title": "Held-out 06 — In-network OB-GYN visit, OCR-damaged scan (4.3(b))",
+      "canaryCount": 6,
+      "groundTruth": {
+        "expected_clause": "4.3(b)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 29,
+        "expected_days_since_denial": 19
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "OUTPATIENT_OBGYN",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "IN_NETWORK",
+          "days_since_service": 29,
+          "days_since_denial": 19,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.3(b) / 8.2",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 6,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Siobhan Kavanagh-Ruiz",
+          "MBR-2218840",
+          "CLM-2026-439915",
+          "Amara Nwosu",
+          "Elmstead Women's Health",
+          "October 27, 2026"
+        ],
+        "citedClause": "4.3(b)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-07",
+      "title": "Held-out 07 — Routine OB-GYN exam with an out-of-network provider (honest negative)",
+      "canaryCount": 7,
+      "groundTruth": {
+        "expected_clause": "4.3(b) / 4.1",
+        "exception_applies": "NO",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 42,
+        "expected_days_since_denial": 30
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL_AND_OON",
+          "service_setting": "OUTPATIENT_OBGYN",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_denial": 30,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.1 / 8.2",
+        "exceptionApplies": "NO",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [
+          "[SERVICE_DATE]"
+        ],
+        "vaultCaptured": 6,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Mei-Lin Castellanos",
+          "CLM-2026-118463",
+          "MBR-7741352",
+          "October 14, 2026",
+          "Rafaela Dumont",
+          "Harborview Midwifery Collective",
+          "mlcastellanos@mailbox.example"
+        ],
+        "citedClause": "4.3(b)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": false,
+          "confirmationMatch": false,
+          "exactPass": false
+        }
+      }
+    },
+    {
+      "id": "holdout-08",
+      "title": "Held-out 08 — Overnight emergency visit at a non-participating hospital (EPO 3.4(a))",
+      "canaryCount": 7,
+      "groundTruth": {
+        "expected_clause": "3.4(a)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 17,
+        "expected_days_since_denial": 7
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-EPO-2026-SELECT",
+          "denial_reason_code": "OTHER",
+          "service_setting": "EMERGENCY_OR_AFTER_HOURS_URGENT",
+          "after_hours_visit_confirmed": "YES",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_service": 17,
+          "days_since_denial": 7,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "3.4(a)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 7,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Saint Brendan Hospital",
+          "Yusuf Haddad",
+          "November 8, 2026"
+        ],
+        "citedClause": "3.4(a)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": false,
+          "exactPass": false
+        }
+      }
+    },
+    {
+      "id": "holdout-09",
+      "title": "Held-out 09 — In-network specialist wrongly denied for a missing referral (EPO 3.1)",
+      "canaryCount": 7,
+      "groundTruth": {
+        "expected_clause": "3.1",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 27,
+        "expected_days_since_denial": 15
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-EPO-2026-SELECT",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "UNKNOWN",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "IN_NETWORK",
+          "days_since_service": 27,
+          "days_since_denial": 15,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "3.1 / 9.1",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 7,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Kenji Watanabe",
+          "Summit Heart Clinic",
+          "October 29, 2026"
+        ],
+        "citedClause": "3.1",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-10",
+      "title": "Held-out 10 — CT without prior auth inside the 10-day window, necessity not stated (EPO 5.2(b))",
+      "canaryCount": 6,
+      "groundTruth": {
+        "expected_clause": "5.2(b)",
+        "exception_applies": "CONDITIONAL",
+        "requires_patient_confirmation": true,
+        "expected_confirmation_topic": "whether medical necessity was documented (request within 10 days)",
+        "expected_days_since_service": 6,
+        "expected_days_since_denial": 4
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-EPO-2026-SELECT",
+          "denial_reason_code": "MISSING_PRIOR_AUTH",
+          "service_setting": "ADVANCED_DIAGNOSTIC_IMAGING",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "UNKNOWN",
+          "days_since_service": 6,
+          "days_since_denial": 4,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "5.2(b)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 6,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Westbrook Diagnostic Center",
+          "Samuel Okonkwo-Baird",
+          "November 19, 2026"
+        ],
+        "citedClause": "5.2(b)",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    },
+    {
+      "id": "holdout-11",
+      "title": "Held-out 11 — Non-emergency out-of-network specialist, not pre-approved (honest negative, EPO 3.1)",
+      "canaryCount": 6,
+      "groundTruth": {
+        "expected_clause": "3.1",
+        "exception_applies": "NO",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 71,
+        "expected_days_since_denial": 56
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-EPO-2026-SELECT",
+          "denial_reason_code": "OTHER",
+          "service_setting": "EMERGENCY_OR_AFTER_HOURS_URGENT",
+          "after_hours_visit_confirmed": "NO",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_denial": 56,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "3.4(a) / 9.1",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "orphanPlaceholders": [
+          "[SERVICE_DATE]"
+        ],
+        "vaultCaptured": 5,
+        "score": {
+          "clauseMatch": false,
+          "exceptionMatch": false,
+          "confirmationMatch": false,
+          "exactPass": false
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "CLM-2026-304412",
+          "September 15, 2026",
+          "Beatriz Montoya",
+          "Alder Ridge Orthopedics",
+          "MBR-5107733"
+        ],
+        "citedClause": "3.1",
+        "exceptionApplies": "CONDITIONAL",
+        "needsConfirmation": true,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": false,
+          "confirmationMatch": false,
+          "exactPass": false
+        }
+      }
+    },
+    {
+      "id": "holdout-12",
+      "title": "Held-out 12 — Daytime urgent care on a public holiday (4.2(a))",
+      "canaryCount": 8,
+      "groundTruth": {
+        "expected_clause": "4.2(a)",
+        "exception_applies": "YES",
+        "requires_patient_confirmation": false,
+        "expected_confirmation_topic": null,
+        "expected_days_since_service": 79,
+        "expected_days_since_denial": 65
+      },
+      "cleave": {
+        "status": "COMPLETED",
+        "localSource": "on_device",
+        "localNetworkRequests": 0,
+        "cloudSource": "in_cloud",
+        "outgoingPayload": {
+          "plan_id": "PLAN-HMO-2026-GOLD",
+          "denial_reason_code": "MISSING_REFERRAL",
+          "service_setting": "UNKNOWN",
+          "after_hours_visit_confirmed": "NOT_MENTIONED",
+          "network_status": "OUT_OF_NETWORK",
+          "days_since_service": 79,
+          "days_since_denial": 65,
+          "urgency_documented": "NOT_MENTIONED",
+          "ongoing_treatment": "NOT_MENTIONED",
+          "enrollment_date_known": "NOT_MENTIONED"
+        },
+        "leakedCanaries": [],
+        "citedClause": "4.1 / 8.2",
+        "exceptionApplies": "NO",
+        "needsConfirmation": false,
+        "orphanPlaceholders": [],
+        "vaultCaptured": 8,
+        "score": {
+          "clauseMatch": false,
+          "exceptionMatch": false,
+          "confirmationMatch": true,
+          "exactPass": false
+        }
+      },
+      "manualBaseline": {
+        "policyMatched": true,
+        "leakedCanaries": [
+          "Fernwood Urgent Care",
+          "Tobias Engel",
+          "September 7, 2026"
+        ],
+        "citedClause": "4.2(a)",
+        "exceptionApplies": "YES",
+        "needsConfirmation": false,
+        "score": {
+          "clauseMatch": true,
+          "exceptionMatch": true,
+          "confirmationMatch": true,
+          "exactPass": true
+        }
+      }
+    }
+  ]
+}

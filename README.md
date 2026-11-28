@@ -133,7 +133,8 @@ Building Cleave against real Chrome 158 Gemini Nano, `@firebase/ai`, and iOS 27 
 
 Tested live on **Chrome 158 (`nano_v3_gpu_component`)** + **Firebase AI Logic (`gemini-3.5-flash-lite`, Spark free tier)** across **6 pre-annotated synthetic missing-referral / prior-auth cases** containing **50 planted personal identifiers** (compared against a realistic stressed-patient manual-redaction baseline):
 
-- **Planted identifiers in captured outbound HTTPS bodies:** **0 / 50** for Cleave vs **8 / 50** for realistic manual redaction.
+- **Held-out set (pre-registered, 12 new letters, 83 planted identifiers):** written after the code, committed and pushed before any run (`5ff5e3a`), and scored on the first run. Cleave got **10 / 12** exact passes with **0 / 83** identifiers leaked; a mechanical manual-redaction baseline got 9 / 12 and leaked 49 / 83. Gemini Nano captured 76 / 83 identifiers for the local re-join (53 / 83 with code rules alone). Both misses are listed with root causes, one a holiday the allowlist can't express, in [`eval/HOLDOUT.md`](eval/HOLDOUT.md).
+- **Planted identifiers in captured outbound HTTPS bodies (dev set):** **0 / 50** for Cleave vs **8 / 50** for realistic manual redaction.
 - **Completed cases / false refusals (tracked separately):** **6 / 6** completed, **0 / 6** false refusals, **4 / 4** valid named refusals (including live `PREFER_ON_DEVICE` Base64 PDF leak proof vs `ONLY_ON_DEVICE` 0-HTTP fail-closed proof).
 - **Exact ground-truth pass (clause + exception status + unresolved-fact confirmation):** **6 / 6** in the hardened Cleave Chrome Web rehearsal (up from 5 / 6 in the pre-build probe) vs **2 / 6** (3 / 6 in probe) for realistic manual redaction.
 - **Orphan placeholders after local re-join:** **0** across all 6 cases.

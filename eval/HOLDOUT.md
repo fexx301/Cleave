@@ -52,3 +52,37 @@ What makes these letters harder than the dev set:
 - an OCR-damaged scan (06);
 - dates only in prose, or in unlabelled or pipe-format lines (01, 04, 07, 11);
 - a public holiday instead of a clock time (12).
+
+## Results: first run (the held-out result)
+
+Pre-registered in commit `5ff5e3a` (2026-11-28 08:54 +01:00, pushed before any run). Both layers were run once, as below. No code, prompts or letters changed in between.
+
+| | Cleave | Mechanical manual baseline |
+|---|---|---|
+| Planted identifiers in outgoing requests | **0 / 83** | 49 / 83 |
+| Exact pass (clause + verdict + confirmation) | **10 / 12** | 9 / 12 |
+| Correct clause cited | 10 / 12 | 12 / 12 |
+| Completed / false refusals | 12 / 0 | n/a |
+
+The baseline sends the whole redacted letter, so the cloud sees full context. That makes it about as accurate as Cleave, and it is why it leaks 59% of the identifiers.
+
+**Live hybrid run** (`eval/holdout-live-run1.json`, 2026-11-28 07:59 UTC, Chrome with Gemini Nano + `gemini-3.5-flash-lite` via Firebase AI Logic). Every local step reported `on_device` and every cloud step `in_cloud`.
+
+| What can fail | Live (Gemini Nano + rules) | Floor (rules only, `eval/holdout-floor.json`) |
+|---|---|---|
+| Re-join coverage (identifiers captured in the local vault) | **76 / 83** | 53 / 83 |
+| Blanks left in drafts (identifiers not captured, member fills them in) | 7 | n/a |
+| Days since service correct | 7 / 12 | 7 / 12 |
+| Days since notice correct | 10 / 12 | 10 / 12 |
+| Planted identifiers in Cleave's outgoing payload | 0 / 83 | 0 / 83 |
+
+### Every miss
+
+- **holdout-12 (Labor Day urgent care) — wrong verdict.** Cleave said NO (4.1); the truth is YES (4.2(a) covers holidays). The visit was at 2:05 PM on a public holiday, and no allowlist field could carry "holiday": after-hours was `NOT_MENTIONED` and setting `UNKNOWN`. The fact that decides the case never reached the cloud.
+- **holdout-11 (EPO out-of-network orthopedics) — wrong verdict.** Cleave said CONDITIONAL via 3.4(a) and asked a question; the truth is NO (3.1). Gemini Nano labelled a scheduled knee consultation `EMERGENCY_OR_AFTER_HOURS_URGENT`, so the cloud reasoned from the emergency clause. Asking rather than refusing is the safer failure, but it is still a miss.
+- **Day counts:** dates written only in prose (01, 02, 07, 11) or in a pipe table (04) were not counted. Those fields were left out of the payload rather than guessed; no case failed because of it.
+- **Re-join:** 7 identifiers across 01, 02, 04, 07 and 11 were not captured locally. They are left as visible blanks in the draft, not sent anywhere.
+
+### After fixes
+
+None yet. Any fix made because of these results will be reported here as a separate row, never as the held-out number.
